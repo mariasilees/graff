@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grafo Interactivo - Red Social</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: white; }
+        h1 { text-align: center; color: #333; margin-bottom: 10px; }
+        .container { max-width: 1400px; margin: 0 auto; position: relative; }
+        #graph { border: 2px solid #333; border-radius: 8px; background: white; }
+        .node { cursor: pointer; stroke: white; stroke-width: 2px; }
+        .supernode { cursor: pointer; stroke: white; stroke-width: 3px; }
+        .link { stroke: #888; stroke-opacity: 0.6; stroke-width: 2px; }
+        .node-label { font-size: 11px; font-weight: bold; text-anchor: middle; pointer-events: none; fill: white; }
+        .supernode-label { font-size: 14px; font-weight: bold; text-anchor: middle; pointer-events: none; fill: white; }
+        .cluster-label { font-size: 16px; font-weight: bold; text-anchor: middle; pointer-events: none; opacity: 0; transition: opacity 0.5s; }
+        .tooltip { position: fixed; padding: 12px; background: yellow; border: 2px solid orange; border-radius: 8px; pointer-events: none; opacity: 0; font-size: 11px; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 2000; max-width: 300px; }
+        .warning-box { background: rgba(231, 76, 60, 0.9); border: 3px solid darkred; border-radius: 10px; padding: 15px; margin: 20px auto; width: 280px; font-size: 12px; font-weight: bold; transition: all 0.5s; }
+        .warning-box.protected { background: rgba(46, 204, 113, 0.9); border: 3px solid green; }
+        .warning-box.anonymous { background: rgba(52, 152, 219, 0.9); border: 3px solid #2980b9; }
+        .warning-box h3 { margin: 0 0 10px 0; color: #c0392b; font-size: 14px; }
+        .warning-box.protected h3 { color: #27ae60; }
+        .warning-box.anonymous h3 { color: #2980b9; }
+        .controls { text-align: center; margin: 15px 0; }
+        button { padding: 10px 20px; margin: 0 5px; font-size: 14px; font-weight: bold; border: 2px solid #3498db; background: #3498db; color: white; border-radius: 5px; cursor: pointer; transition: background 0.3s; }
+        button:hover { background: #2980b9; }
+        button.active { background: #27ae60; border-color: #27ae60; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GRAFO INTERACTIVO: Red Social de 30 Personas</h1>
+        <div class="warning-box" id="warningBox">
+            <h3 id="warningTitle"> RIESGO DE PRIVACIDAD</h3>
+            <span id="warningText">
+                 Todos los nodos son identificables<br>
+                 Nombres, edades y profesiones visibles<br>
+                 Relaciones personales expuestas<br>
+                 Fácil seguimiento individual<br><br>
+                <strong>30 personas identificables<br>45 conexiones visibles</strong>
+            </span>
+        </div>
+        <div class="controls">
+            <button onclick="toggleClusters()" id="clusterBtn"> Agrupar por Ciudades</button>
+            <button onclick="resetSimulation()"> Reset Vista</button>
+            <button onclick="pauseSimulation()"> Pausar/Reanudar</button>
+        </div>
+        <svg id="graph" width="1400" height="800"></svg>
+        <div class="tooltip" id="tooltip"></div>
+    </div>
+    <script>
+const originalNodes=[{id:'Ana',edad:22,ciudad:'Barcelona',profesion:'Estudiante'},{id:'Luis',edad:20,ciudad:'Madrid',profesion:'Estudiante'},{id:'María',edad:23,ciudad:'Barcelona',profesion:'Becaria'},{id:'Carlos',edad:21,ciudad:'Valencia',profesion:'Estudiante'},{id:'Sofia',edad:24,ciudad:'Madrid',profesion:'Diseñadora'},{id:'Diego',edad:19,ciudad:'Sevilla',profesion:'Estudiante'},{id:'Laura',edad:22,ciudad:'Barcelona',profesion:'Becaria'},{id:'Pedro',edad:25,ciudad:'Madrid',profesion:'Programador'},{id:'Elena',edad:20,ciudad:'Valencia',profesion:'Estudiante'},{id:'Javier',edad:23,ciudad:'Barcelona',profesion:'Ingeniero'},{id:'Roberto',edad:35,ciudad:'Madrid',profesion:'Arquitecto'},{id:'Carmen',edad:38,ciudad:'Barcelona',profesion:'Abogada'},{id:'Fernando',edad:42,ciudad:'Valencia',profesion:'Médico'},{id:'Isabel',edad:33,ciudad:'Sevilla',profesion:'Profesora'},{id:'Miguel',edad:40,ciudad:'Madrid',profesion:'Empresario'},{id:'Patricia',edad:36,ciudad:'Barcelona',profesion:'Enfermera'},{id:'Andrés',edad:44,ciudad:'Valencia',profesion:'Ingeniero'},{id:'Beatriz',edad:31,ciudad:'Madrid',profesion:'Periodista'},{id:'Jorge',edad:39,ciudad:'Barcelona',profesion:'Contador'},{id:'Rosa',edad:37,ciudad:'Sevilla',profesion:'Farmacéutica'},{id:'Antonio',edad:65,ciudad:'Madrid',profesion:'Jubilado'},{id:'Dolores',edad:68,ciudad:'Barcelona',profesion:'Jubilada'},{id:'Francisco',edad:62,ciudad:'Valencia',profesion:'Jubilado'},{id:'Teresa',edad:70,ciudad:'Sevilla',profesion:'Jubilada'},{id:'José',edad:66,ciudad:'Madrid',profesion:'Jubilado'},{id:'Pilar',edad:64,ciudad:'Barcelona',profesion:'Jubilada'},{id:'Manuel',edad:69,ciudad:'Valencia',profesion:'Jubilado'},{id:'Concepción',edad:63,ciudad:'Madrid',profesion:'Jubilada'},{id:'Ramón',edad:67,ciudad:'Barcelona',profesion:'Jubilado'},{id:'Mercedes',edad:71,ciudad:'Sevilla',profesion:'Jubilada'}];
+const originalLinks=[{source:'Ana',target:'Luis'},{source:'Ana',target:'María'},{source:'Luis',target:'María'},{source:'Carlos',target:'Sofia'},{source:'Diego',target:'Laura'},{source:'Pedro',target:'Elena'},{source:'Sofia',target:'Javier'},{source:'Laura',target:'Carlos'},{source:'Roberto',target:'Carmen'},{source:'Fernando',target:'Miguel'},{source:'Patricia',target:'Isabel'},{source:'Jorge',target:'Beatriz'},{source:'Andrés',target:'Rosa'},{source:'Miguel',target:'Jorge'},{source:'Antonio',target:'José'},{source:'Dolores',target:'Pilar'},{source:'Francisco',target:'Manuel'},{source:'Teresa',target:'Mercedes'},{source:'Ramón',target:'Concepción'},{source:'José',target:'Manuel'},{source:'Ana',target:'Roberto'},{source:'Luis',target:'Carmen'},{source:'María',target:'Patricia'},{source:'Carlos',target:'Fernando'},{source:'Sofia',target:'Miguel'},{source:'Diego',target:'Isabel'},{source:'Laura',target:'Andrés'},{source:'Pedro',target:'Beatriz'},{source:'Elena',target:'Jorge'},{source:'Javier',target:'Rosa'},{source:'Roberto',target:'Antonio'},{source:'Carmen',target:'Dolores'},{source:'Fernando',target:'Francisco'},{source:'Isabel',target:'Teresa'},{source:'Miguel',target:'José'},{source:'Patricia',target:'Pilar'},{source:'Andrés',target:'Manuel'},{source:'Beatriz',target:'Concepción'},{source:'Jorge',target:'Ramón'},{source:'Rosa',target:'Mercedes'},{source:'Ana',target:'Dolores'},{source:'Luis',target:'Antonio'},{source:'María',target:'Pilar'},{source:'Carlos',target:'José'},{source:'Sofia',target:'Teresa'},{source:'Diego',target:'Francisco'}];
+let nodes=JSON.parse(JSON.stringify(originalNodes));
+let links=JSON.parse(JSON.stringify(originalLinks));
+const colorScale=d3.scaleOrdinal().domain(['Barcelona','Madrid','Valencia','Sevilla']).range(['#e74c3c','#3498db','#2ecc71','#f39c12']);
+const clusterCenters={Barcelona:{x:300,y:400},Madrid:{x:700,y:200},Valencia:{x:1100,y:400},Sevilla:{x:700,y:600}};
+const svg=d3.select('#graph'),width=+svg.attr('width'),height=+svg.attr('height');
+const zoom=d3.zoom().scaleExtent([0.5,3]).on('zoom',(e)=>g.attr('transform',e.transform));
+svg.call(zoom);
+const g=svg.append('g');
+let clustered=false;
+let fused=false;
+let fusionTimeout=null;
+const clusterForce=(alpha)=>{if(clustered&&!fused){nodes.forEach(n=>{const center=clusterCenters[n.ciudad];n.vx-=(n.x-center.x)*alpha*0.3;n.vy-=(n.y-center.y)*alpha*0.3;});}};
+let simulation=d3.forceSimulation(nodes).force('link',d3.forceLink(links).id(d=>d.id).distance(90)).force('charge',d3.forceManyBody().strength(-250)).force('center',d3.forceCenter(width/2,height/2)).force('cluster',clusterForce).force('collision',d3.forceCollide().radius(35));
+let link=g.append('g').selectAll('line');
+let node=g.append('g').selectAll('circle');
+let label=g.append('g').selectAll('text');
+const clusterLabels=g.append('g').selectAll('.cluster-label').data(Object.keys(clusterCenters)).enter().append('text').attr('class','cluster-label').text(d=>d).attr('fill',d=>colorScale(d)).attr('x',d=>clusterCenters[d].x).attr('y',d=>clusterCenters[d].y-120);
+const tooltip=d3.select('#tooltip');
+const warningBox=d3.select('#warningBox');
+const warningTitle=d3.select('#warningTitle');
+const warningText=d3.select('#warningText');
+const clusterBtn=d3.select('#clusterBtn');
+let isPaused=false;
+function updateGraph(){
+    link=link.data(links,d=>d.source.id+'-'+d.target.id);
+    link.exit().remove();
+    link=link.enter().append('line').attr('class','link').merge(link);
+    node=node.data(nodes,d=>d.id);
+    node.exit().remove();
+    const nodeEnter=node.enter().append('circle').attr('class',d=>d.isSupernode?'supernode':'node').attr('r',d=>d.isSupernode?50:30).attr('fill',d=>fused?colorScale(d.ciudad):(clustered?colorScale(d.ciudad):'#3498db')).call(d3.drag().on('start',(e,d)=>{if(!e.active)simulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;}).on('end',(e,d)=>{if(!e.active)simulation.alphaTarget(0);d.fx=null;d.fy=null;})).on('mouseover',(e,d)=>{let html='<strong>'+d.id+'</strong>';if(d.isSupernode){html+='<br><br> <strong>Total personas:</strong> '+d.count;html+='<br> <strong>Edad media:</strong> '+d.avgAge.toFixed(1)+' años';html+='<br><br> <strong>Conexiones con otras ciudades:</strong>';const cities=['Barcelona','Madrid','Valencia','Sevilla'];cities.forEach(city=>{if(city!==d.ciudad&&d.cityConnections[city]>0){html+='<br>    '+city+': '+d.cityConnections[city];}});html+='<br><br><strong>Por profesión:</strong>';const profCounts={};d.professions.forEach(p=>{profCounts[p]=(profCounts[p]||0)+1;});Object.keys(profCounts).sort((a,b)=>profCounts[b]-profCounts[a]).forEach(prof=>{html+='<br>    '+prof+': '+profCounts[prof];});}else{html+='<br>Ciudad: '+d.ciudad+'<br>Edad: '+d.edad+' años<br>Profesión: '+d.profesion;}tooltip.style('opacity',1).html(html).style('left',e.clientX+10+'px').style('top',e.clientY+10+'px');}).on('mousemove',(e)=>tooltip.style('left',e.clientX+10+'px').style('top',e.clientY+10+'px')).on('mouseout',()=>tooltip.style('opacity',0));
+    node=nodeEnter.merge(node);
+    label=label.data(nodes,d=>d.id);
+    label.exit().remove();
+    const labelEnter=label.enter().append('text').attr('class',d=>d.isSupernode?'supernode-label':'node-label').text(d=>d.id);
+    label=labelEnter.merge(label);
+    simulation.nodes(nodes);
+    simulation.force('link').links(links);
+    simulation.alpha(1).restart();
+    simulation.on('tick',()=>{link.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);node.attr('cx',d=>d.x).attr('cy',d=>d.y);label.attr('x',d=>d.x).attr('y',d=>d.y+5);});
+}
+updateGraph();
+function toggleClusters(){
+    if(fused)return;
+    clustered=!clustered;
+    if(clustered){
+        node.transition().duration(1000).attr('fill',d=>colorScale(d.ciudad));
+        clusterLabels.transition().duration(1000).style('opacity',1);
+        simulation.force('charge',d3.forceManyBody().strength(-120));
+        warningBox.classed('protected',true);
+        warningTitle.html(' PROTECCIÓN MEJORADA');
+        warningText.html(' Agrupados por ciudad<br> Identidades individuales menos visibles<br> Clusters visuales por ciudad<br> Dificulta identificación específica<br><br><strong>4 Ciudades<br>30 personas agrupadas</strong>');
+        clusterBtn.classed('active',true).html(' Vista Individual').attr('disabled','disabled');
+        fusionTimeout=setTimeout(fusionNodes,5000);
+    }else{
+        if(fusionTimeout){
+            clearTimeout(fusionTimeout);
+            fusionTimeout=null;
+        }
+        node.transition().duration(1000).attr('fill','#3498db');
+        clusterLabels.transition().duration(1000).style('opacity',0);
+        simulation.force('charge',d3.forceManyBody().strength(-250));
+        warningBox.classed('protected',false).classed('anonymous',false);
+        warningTitle.html(' RIESGO DE PRIVACIDAD');
+        warningText.html(' Todos los nodos son identificables<br> Nombres, edades y profesiones visibles<br> Relaciones personales expuestas<br> Fácil seguimiento individual<br><br><strong>30 personas identificables<br>45 conexiones visibles</strong>');
+        clusterBtn.classed('active',false).html(' Agrupar por Ciudades').attr('disabled',null);
+    }
+    simulation.alpha(1).restart();
+}
+function fusionNodes(){
+    if(fused)return;
+    fused=true;
+    const cityGroups={};
+    originalNodes.forEach(n=>{if(!cityGroups[n.ciudad])cityGroups[n.ciudad]=[];cityGroups[n.ciudad].push(n);});
+    nodes=Object.keys(cityGroups).map(ciudad=>{const people=cityGroups[ciudad];const avgAge=people.reduce((sum,p)=>sum+p.edad,0)/people.length;const professions=people.map(p=>p.profesion);const memberIds=people.map(p=>p.id);const cityConnections={Barcelona:0,Madrid:0,Valencia:0,Sevilla:0};originalLinks.forEach(l=>{const sourceId=typeof l.source==='string'?l.source:l.source.id;const targetId=typeof l.target==='string'?l.target:l.target.id;const sourceCiudad=originalNodes.find(n=>n.id===sourceId).ciudad;const targetCiudad=originalNodes.find(n=>n.id===targetId).ciudad;if(sourceCiudad===ciudad&&targetCiudad!==ciudad){cityConnections[targetCiudad]++;}else if(targetCiudad===ciudad&&sourceCiudad!==ciudad){cityConnections[sourceCiudad]++;}});const totalConnections=Object.values(cityConnections).reduce((a,b)=>a+b,0);return{id:ciudad,ciudad:ciudad,isSupernode:true,count:people.length,avgAge:avgAge,professions:professions,members:memberIds,cityConnections:cityConnections,connections:totalConnections};});
+    const cityConnections=new Set();
+    originalLinks.forEach(l=>{const sourceCiudad=originalNodes.find(n=>n.id===l.source||n.id===l.source.id).ciudad;const targetCiudad=originalNodes.find(n=>n.id===l.target||n.id===l.target.id).ciudad;if(sourceCiudad!==targetCiudad){const key=[sourceCiudad,targetCiudad].sort().join('-');cityConnections.add(key);}});
+    links=Array.from(cityConnections).map(key=>{const[c1,c2]=key.split('-');return{source:c1,target:c2};});
+    clusterLabels.transition().duration(1000).style('opacity',0);
+    simulation.force('charge',d3.forceManyBody().strength(-300));
+    simulation.force('collision',d3.forceCollide().radius(60));
+    simulation.force('link').distance(200);
+    warningBox.classed('protected',false).classed('anonymous',true);
+    warningTitle.html(' MÁXIMA PROTECCIÓN');
+    warningText.html(' Solo ciudades visibles<br> '+links.length+' conexiones entre ciudades<br> Identidades completamente anonimizadas<br> Solo datos agregados disponibles<br><br><strong>4 Supernodos<br>'+originalNodes.length+' personas protegidas</strong>');
+    clusterBtn.html(' Supernodos Activos');
+    updateGraph();
+}
+function resetSimulation(){
+    if(fusionTimeout){
+        clearTimeout(fusionTimeout);
+        fusionTimeout=null;
+    }
+    if(fused){
+        fused=false;
+        clustered=false;
+        nodes=JSON.parse(JSON.stringify(originalNodes));
+        links=JSON.parse(JSON.stringify(originalLinks));
+        simulation.force('charge',d3.forceManyBody().strength(-250));
+        simulation.force('collision',d3.forceCollide().radius(35));
+        simulation.force('link').distance(90);
+        clusterLabels.transition().duration(1000).style('opacity',0);
+        warningBox.classed('anonymous',false).classed('protected',false);
+        warningTitle.html(' RIESGO DE PRIVACIDAD');
+        warningText.html(' Todos los nodos son identificables<br> Nombres, edades y profesiones visibles<br> Relaciones personales expuestas<br> Fácil seguimiento individual<br><br><strong>30 personas identificables<br>45 conexiones visibles</strong>');
+        clusterBtn.classed('active',false).html(' Agrupar por Ciudades').attr('disabled',null);
+        updateGraph();
+    }else{
+        simulation.alpha(1).restart();
+        svg.transition().duration(750).call(zoom.transform,d3.zoomIdentity);
+    }
+}
+function pauseSimulation(){if(isPaused){simulation.alphaTarget(0).restart();isPaused=false;}else{simulation.stop();isPaused=true;}}
+    </script>
+</body>
+</html>
