@@ -24,7 +24,18 @@
         .supernode-label { font-size: 14px; font-weight: bold; text-anchor: middle; pointer-events: none; fill: white; }
         .cluster-label { font-size: 16px; font-weight: bold; text-anchor: middle; pointer-events: none; opacity: 0; transition: opacity 0.5s; }
         .tooltip { position: fixed; padding: 12px; background: yellow; border: 2px solid orange; border-radius: 8px; pointer-events: none; opacity: 0; font-size: 11px; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 2000; max-width: 400px; }
-        .warning-box { background: rgba(231, 76, 60, 0.9); border: 3px solid darkred; border-radius: 10px; padding: 15px; margin: 20px auto; width: 450px; font-size: 12px; font-weight: bold; transition: all 0.5s; }
+        .warning-box { background: rgba(231, 76, 60, 0.9); border: 3px solid darkred; border-radius: 10px; padding: 15px; margin: 20px auto; width: 850px; font-size: 12px; font-weight: bold; transition: all 0.5s; }
+        .metric-row { display: flex; align-items: center; margin: 8px 0; gap: 15px; }
+        .metric-btn { padding: 8px 15px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; min-width: 160px; font-size: 12px; }
+        .metric-btn:hover { opacity: 0.8; }
+        .metric-result { flex: 1; background: rgba(255,255,255,0.2); padding: 8px 12px; border-radius: 5px; font-size: 11px; min-height: 20px; border-left: 3px solid #3498db; }
+        .btn-degree { background: #3498db; }
+        .btn-clustering { background: #2ecc71; }
+        .result-clustering { border-left-color: #2ecc71; }
+        .btn-centrality { background: #e67e22; }
+        .result-centrality { border-left-color: #e67e22; }
+        .btn-perturb { background: #e74c3c; border: 2px solid #c0392b; padding: 10px 20px; font-size: 14px; margin-top: 10px; }
+        .btn-compare { background: #9b59b6; border: 2px solid #8e44ad; padding: 10px 20px; font-size: 14px; margin-top: 10px; }
         .warning-box.protected { background: rgba(46, 204, 113, 0.9); border: 3px solid green; }
         .warning-box.kanon { background: rgba(155, 89, 182, 0.9); border: 3px solid #8e44ad; }
         .warning-box.automorph { background: rgba(231, 76, 60, 0.9); border: 3px solid #c0392b; }
@@ -61,6 +72,7 @@
             <button onclick="toggleClusters()" id="clusterBtn">🏙️ Agrupar por Ciudades</button>
             <button onclick="detectCommunities()" id="communityBtn">🔍 Detectar Comunidades (Louvain)</button>
             <button onclick="applyClusteringPreserving()" id="clusteringBtn" class="automorph-btn">🎯 Clustering Preserving Randomization</button>
+            <button onclick="applySpectralPerturbation()" id="spectralBtn" class="automorph-btn">🌊 Perturbación Espectral</button>
             <button onclick="applyKAnonymity()" id="kanonBtn" class="kanon-btn">🟣 K-Anonimidad (k=3)</button>
             <button onclick="applyEdgePerturbation()" id="perturbBtn" class="automorph-btn">🔀 Differential Privacy (ε=2.5)</button>
             <button onclick="resetSimulation()">🔄 Reset Vista</button>
@@ -88,8 +100,11 @@ let kanonActive=false;
 let perturbActive=false;
 let communityActive=false;
 let clusteringPreservingActive=false;
+let spectralActive=false;
 let fusionTimeout=null;
 let communities=[];
+let spectralPhase='original';
+let spectralMetrics={};
 const clusterForce=(alpha)=>{
     if(clustered&&!fused&&!kanonActive&&!perturbActive&&!communityActive){
         nodes.forEach(n=>{
@@ -124,6 +139,7 @@ const warningText=d3.select('#warningText');
 const clusterBtn=d3.select('#clusterBtn');
 const communityBtn=d3.select('#communityBtn');
 const clusteringBtn=d3.select('#clusteringBtn');
+const spectralBtn=d3.select('#spectralBtn');
 const kanonBtn=d3.select('#kanonBtn');
 const perturbBtn=d3.select('#perturbBtn');
 let isPaused=false;
@@ -148,7 +164,7 @@ function updateGraph(){
 }
 updateGraph();
 function detectCommunities(){
-    if(fused||kanonActive||perturbActive||clusteringPreservingActive)return;
+    if(fused||kanonActive||perturbActive||clusteringPreservingActive||spectralActive)return;
     communityActive=true;
     console.log('🔍 DETECTANDO COMUNIDADES CON ALGORITMO LOUVAIN');
     const nodeCommunity={};
@@ -360,6 +376,7 @@ function detectCommunities(){
     clusteringBtn.attr('disabled','disabled');
     kanonBtn.attr('disabled','disabled');
     perturbBtn.attr('disabled','disabled');
+    spectralBtn.attr('disabled','disabled');
     updateGraph();
     setTimeout(()=>{
         console.log('🔒 Aplicando generalización de comunidades...');
@@ -427,7 +444,7 @@ function detectCommunities(){
     },4000);
 }
 function applyClusteringPreserving(){
-    if(fused||clustered||kanonActive||perturbActive||communityActive)return;
+    if(fused||clustered||kanonActive||perturbActive||communityActive||spectralActive)return;
     clusteringPreservingActive=true;
     console.log('🎯 APLICANDO CLUSTERING PRESERVING RANDOMIZATION');
     const nodeCommunity={};
@@ -635,6 +652,7 @@ function applyClusteringPreserving(){
     communityBtn.attr('disabled','disabled');
     kanonBtn.attr('disabled','disabled');
     perturbBtn.attr('disabled','disabled');
+    spectralBtn.attr('disabled','disabled');
     updateGraph();
     setTimeout(()=>{
         console.log('🎯 Revelando comunidades preservadas...');
@@ -650,8 +668,340 @@ function applyClusteringPreserving(){
         warningText.html(finalHTML);
     },8000);
 }
+function calculateDegree(){
+    const degreeMap={};
+    nodes.forEach(n=>{
+        const degree=links.filter(l=>(l.source.id||l.source)===n.id||(l.target.id||l.target)===n.id).length;
+        degreeMap[n.id]=degree;
+    });
+    const avgDegree=Object.values(degreeMap).reduce((a,b)=>a+b,0)/nodes.length;
+    const maxDegree=Math.max(...Object.values(degreeMap));
+    const minDegree=Math.min(...Object.values(degreeMap));
+    let html='<strong>Grado medio: '+avgDegree.toFixed(2)+'</strong> | Máx: '+maxDegree+' | Mín: '+minDegree+' | Aristas: '+links.length;
+    d3.select('#degreeResult').html(html);
+    spectralMetrics['degree'+spectralPhase]=avgDegree;
+    return avgDegree;
+}
+function calculateClustering(){
+    const adjMatrix=[];
+    for(let i=0;i<nodes.length;i++){
+        adjMatrix[i]=[];
+        for(let j=0;j<nodes.length;j++){
+            adjMatrix[i][j]=0;
+        }
+    }
+    links.forEach(l=>{
+        const si=nodes.findIndex(n=>n.id===(l.source.id||l.source));
+        const ti=nodes.findIndex(n=>n.id===(l.target.id||l.target));
+        if(si>=0&&ti>=0){
+            adjMatrix[si][ti]=1;
+            adjMatrix[ti][si]=1;
+        }
+    });
+    let avgClustering=0;
+    let totalNodes=0;
+    nodes.forEach(n=>{
+        const neighbors=[];
+        links.forEach(l=>{
+            if((l.source.id||l.source)===n.id)neighbors.push(l.target.id||l.target);
+            if((l.target.id||l.target)===n.id)neighbors.push(l.source.id||l.source);
+        });
+        if(neighbors.length<2)return;
+        let triangles=0;
+        for(let i=0;i<neighbors.length;i++){
+            for(let j=i+1;j<neighbors.length;j++){
+                const ni=nodes.findIndex(x=>x.id===neighbors[i]);
+                const nj=nodes.findIndex(x=>x.id===neighbors[j]);
+                if(ni>=0&&nj>=0&&adjMatrix[ni][nj]===1)triangles++;
+            }
+        }
+        const possibleTriangles=(neighbors.length*(neighbors.length-1))/2;
+        const coeff=possibleTriangles>0?triangles/possibleTriangles:0;
+        avgClustering+=coeff;
+        totalNodes++;
+    });
+    avgClustering=totalNodes>0?avgClustering/totalNodes:0;
+    let html='<strong>Clustering: '+avgClustering.toFixed(3)+'</strong> | Tendencia a formar triángulos (0-1)';
+    d3.select('#clusteringResult').html(html);
+    spectralMetrics['clustering'+spectralPhase]=avgClustering;
+    return avgClustering;
+}
+function calculateBetweenness(){
+    const betweenessCentrality={};
+    nodes.forEach(n=>betweenessCentrality[n.id]=0);
+    nodes.forEach(s=>{
+        const stack=[];
+        const paths={};
+        const sigma={};
+        const dist={};
+        const pred={};
+        nodes.forEach(w=>{
+            pred[w.id]=[];
+            paths[w.id]=[];
+            sigma[w.id]=0;
+            dist[w.id]=-1;
+        });
+        sigma[s.id]=1;
+        dist[s.id]=0;
+        const queue=[s.id];
+        while(queue.length>0){
+            const v=queue.shift();
+            stack.push(v);
+            const neighbors=[];
+            links.forEach(l=>{
+                if((l.source.id||l.source)===v)neighbors.push(l.target.id||l.target);
+                if((l.target.id||l.target)===v)neighbors.push(l.source.id||l.source);
+            });
+            neighbors.forEach(w=>{
+                if(dist[w]===-1){
+                    dist[w]=dist[v]+1;
+                    queue.push(w);
+                }
+                if(dist[w]===dist[v]+1){
+                    sigma[w]+=sigma[v];
+                    pred[w].push(v);
+                }
+            });
+        }
+        const delta={};
+        nodes.forEach(v=>delta[v.id]=0);
+        while(stack.length>0){
+            const w=stack.pop();
+            pred[w].forEach(v=>{
+                delta[v]+=(sigma[v]/sigma[w])*(1+delta[w]);
+            });
+            if(w!==s.id)betweenessCentrality[w]+=delta[w];
+        }
+    });
+    const maxBetweenness=Math.max(...Object.values(betweenessCentrality));
+    const avgBetweenness=Object.values(betweenessCentrality).reduce((a,b)=>a+b,0)/nodes.length;
+    const topNodes=Object.keys(betweenessCentrality).sort((a,b)=>betweenessCentrality[b]-betweenessCentrality[a]).slice(0,3);
+    let html='<strong>Centralidad máx: '+maxBetweenness.toFixed(2)+'</strong> | Media: '+avgBetweenness.toFixed(2)+' | Top: '+topNodes[0]+' ('+betweenessCentrality[topNodes[0]].toFixed(1)+')';
+    d3.select('#centralityResult').html(html);
+    spectralMetrics['betweenness'+spectralPhase]=maxBetweenness;
+    return maxBetweenness;
+}
+function compareMetrics(){
+    let html='<div style=\"background:rgba(255,255,255,0.3);padding:10px;border-radius:5px;margin-top:5px;\"><strong>📊 COMPARACIÓN:</strong><br>';
+    if(spectralMetrics['degreeoriginal']!==undefined&&spectralMetrics['degreeperturbed']!==undefined){
+        const origDeg=spectralMetrics['degreeoriginal'];
+        const pertDeg=spectralMetrics['degreeperturbed'];
+        const percDeg=(Math.abs(pertDeg-origDeg)/origDeg*100).toFixed(1);
+        html+='• <strong>Grado:</strong> '+origDeg.toFixed(2)+' → '+pertDeg.toFixed(2)+' ('+percDeg+'%) ';
+    }
+    if(spectralMetrics['clusteringoriginal']!==undefined&&spectralMetrics['clusteringperturbed']!==undefined){
+        const origClust=spectralMetrics['clusteringoriginal'];
+        const pertClust=spectralMetrics['clusteringperturbed'];
+        const percClust=(Math.abs(pertClust-origClust)/(origClust+0.01)*100).toFixed(1);
+        html+='• <strong>Clustering:</strong> '+origClust.toFixed(3)+' → '+pertClust.toFixed(3)+' ('+percClust+'%) ';
+    }
+    if(spectralMetrics['betweennessoriginal']!==undefined&&spectralMetrics['betweennessperturbed']!==undefined){
+        const origBet=spectralMetrics['betweennessoriginal'];
+        const pertBet=spectralMetrics['betweennessperturbed'];
+        const percBet=(Math.abs(pertBet-origBet)/(origBet+0.01)*100).toFixed(1);
+        html+='• <strong>Centralidad:</strong> '+origBet.toFixed(2)+' → '+pertBet.toFixed(2)+' ('+percBet+'%)<br>';
+    }
+    const allPreserved=(
+        (spectralMetrics['degreeperturbed']&&Math.abs(spectralMetrics['degreeperturbed']-spectralMetrics['degreeoriginal'])/spectralMetrics['degreeoriginal']<0.1)&&
+        (spectralMetrics['clusteringperturbed']&&Math.abs(spectralMetrics['clusteringperturbed']-spectralMetrics['clusteringoriginal'])/(spectralMetrics['clusteringoriginal']+0.01)<0.15)
+    );
+    if(allPreserved){
+        html+='<strong style=\"color:#27ae60\">✓ Propiedades globales preservadas</strong>';
+    }else{
+        html+='<strong style=\"color:#f39c12\">⚠ Propiedades aproximadas</strong>';
+    }
+    html+='</div>';
+    d3.select('#comparisonResult').html(html);
+}
+function applySpectralPerturbation(){
+    if(fused||clustered||kanonActive||communityActive||clusteringPreservingActive||perturbActive)return;
+    spectralActive=true;
+    spectralPhase='original';
+    spectralMetrics={};
+    console.log('🌊 MODO PERTURBACIÓN ESPECTRAL ACTIVADO');
+    warningBox.classed('protected',false).classed('anonymous',false).classed('kanon',false).classed('automorph',true);
+    warningTitle.html('🌊 PERTURBACIÓN ESPECTRAL - GRAFO ORIGINAL');
+    let html='<strong>ANÁLISIS DEL GRAFO ORIGINAL:</strong> '+nodes.length+' nodos • '+links.length+' aristas<br><br>';
+    html+='<div class=\"metric-row\">';
+    html+='<button onclick=\"calculateDegree()\" class=\"metric-btn btn-degree\">📊 Grado Medio</button>';
+    html+='<div id=\"degreeResult\" class=\"metric-result\"><em>Click para calcular</em></div>';
+    html+='</div>';
+    html+='<div class=\"metric-row\">';
+    html+='<button onclick=\"calculateClustering()\" class=\"metric-btn btn-clustering\">🔺 Clustering</button>';
+    html+='<div id=\"clusteringResult\" class=\"metric-result result-clustering\"><em>Click para calcular</em></div>';
+    html+='</div>';
+    html+='<div class=\"metric-row\">';
+    html+='<button onclick=\"calculateBetweenness()\" class=\"metric-btn btn-centrality\">📍 Centralidad</button>';
+    html+='<div id=\"centralityResult\" class=\"metric-result result-centrality\"><em>Click para calcular</em></div>';
+    html+='</div><br>';
+    html+='<button onclick=\"perturbGraph()\" class=\"metric-btn btn-perturb\">🌊 PERTURBAR GRAFO</button>';
+    warningText.html(html);
+    spectralBtn.classed('active',true).attr('disabled','disabled');
+    clusterBtn.attr('disabled','disabled');
+    communityBtn.attr('disabled','disabled');
+    clusteringBtn.attr('disabled','disabled');
+    kanonBtn.attr('disabled','disabled');
+    perturbBtn.attr('disabled','disabled');
+    spectralBtn.classed('active',true).attr('disabled','disabled');
+}
+function perturbGraph(){
+    console.log('🌊 PERTURBANDO GRAFO...');
+    const adjMatrix=[];
+    for(let i=0;i<nodes.length;i++){
+        adjMatrix[i]=[];
+        for(let j=0;j<nodes.length;j++){
+            adjMatrix[i][j]=0;
+        }
+    }
+    links.forEach(l=>{
+        const si=nodes.findIndex(n=>n.id===(l.source.id||l.source));
+        const ti=nodes.findIndex(n=>n.id===(l.target.id||l.target));
+        if(si>=0&&ti>=0){
+            adjMatrix[si][ti]=1;
+            adjMatrix[ti][si]=1;
+        }
+    });
+    const originalDegreeMap={};
+    nodes.forEach(n=>{
+        const degree=links.filter(l=>(l.source.id||l.source)===n.id||(l.target.id||l.target)===n.id).length;
+        originalDegreeMap[n.id]=degree;
+    });
+    const originalAvgDegree=Object.values(originalDegreeMap).reduce((a,b)=>a+b,0)/nodes.length;
+    let originalAvgClustering=0;
+    nodes.forEach(n=>{
+        const neighbors=[];
+        links.forEach(l=>{
+            if((l.source.id||l.source)===n.id)neighbors.push(l.target.id||l.target);
+            if((l.target.id||l.target)===n.id)neighbors.push(l.source.id||l.source);
+        });
+        if(neighbors.length<2)return;
+        let triangles=0;
+        for(let i=0;i<neighbors.length;i++){
+            for(let j=i+1;j<neighbors.length;j++){
+                const ni=nodes.findIndex(x=>x.id===neighbors[i]);
+                const nj=nodes.findIndex(x=>x.id===neighbors[j]);
+                if(ni>=0&&nj>=0&&adjMatrix[ni][nj]===1)triangles++;
+            }
+        }
+        const possibleTriangles=(neighbors.length*(neighbors.length-1))/2;
+        const coeff=possibleTriangles>0?triangles/possibleTriangles:0;
+        originalAvgClustering+=coeff;
+    });
+    originalAvgClustering/=nodes.length;
+    console.log('✓ Grado medio original: '+originalAvgDegree.toFixed(2));
+    console.log('✓ Clustering medio original: '+originalAvgClustering.toFixed(3));
+    const maxIterations=200;
+    const tolerance=0.05;
+    let bestLinks=[...links];
+    let bestError=Infinity;
+    for(let iter=0;iter<maxIterations;iter++){
+        const candidateLinks=[];
+        const existingEdges=new Set();
+        links.forEach(l=>{
+            const s=l.source.id||l.source;
+            const t=l.target.id||l.target;
+            const key=[s,t].sort().join('-');
+            existingEdges.add(key);
+        });
+        links.forEach(l=>{
+            if(Math.random()>0.3){
+                candidateLinks.push({source:l.source.id||l.source,target:l.target.id||l.target});
+            }
+        });
+        const allPairs=[];
+        for(let i=0;i<nodes.length;i++){
+            for(let j=i+1;j<nodes.length;j++){
+                const key=[nodes[i].id,nodes[j].id].sort().join('-');
+                if(!existingEdges.has(key)){
+                    allPairs.push([nodes[i].id,nodes[j].id]);
+                }
+            }
+        }
+        const numToAdd=Math.floor(links.length*0.4);
+        for(let k=0;k<numToAdd&&allPairs.length>0;k++){
+            const idx=Math.floor(Math.random()*allPairs.length);
+            const pair=allPairs.splice(idx,1)[0];
+            candidateLinks.push({source:pair[0],target:pair[1],perturbed:true});
+        }
+        const newDegreeMap={};
+        nodes.forEach(n=>newDegreeMap[n.id]=0);
+        candidateLinks.forEach(l=>{
+            newDegreeMap[l.source]++;
+            newDegreeMap[l.target]++;
+        });
+        const newAvgDegree=Object.values(newDegreeMap).reduce((a,b)=>a+b,0)/nodes.length;
+        const degreeError=Math.abs(newAvgDegree-originalAvgDegree)/originalAvgDegree;
+        const newAdjMatrix=[];
+        for(let i=0;i<nodes.length;i++){
+            newAdjMatrix[i]=[];
+            for(let j=0;j<nodes.length;j++){
+                newAdjMatrix[i][j]=0;
+            }
+        }
+        candidateLinks.forEach(l=>{
+            const si=nodes.findIndex(n=>n.id===l.source);
+            const ti=nodes.findIndex(n=>n.id===l.target);
+            if(si>=0&&ti>=0){
+                newAdjMatrix[si][ti]=1;
+                newAdjMatrix[ti][si]=1;
+            }
+        });
+        let newAvgClustering=0;
+        nodes.forEach(n=>{
+            const neighbors=[];
+            candidateLinks.forEach(l=>{
+                if(l.source===n.id)neighbors.push(l.target);
+                if(l.target===n.id)neighbors.push(l.source);
+            });
+            if(neighbors.length<2)return;
+            let triangles=0;
+            for(let i=0;i<neighbors.length;i++){
+                for(let j=i+1;j<neighbors.length;j++){
+                    const ni=nodes.findIndex(x=>x.id===neighbors[i]);
+                    const nj=nodes.findIndex(x=>x.id===neighbors[j]);
+                    if(ni>=0&&nj>=0&&newAdjMatrix[ni][nj]===1)triangles++;
+                }
+            }
+            const possibleTriangles=(neighbors.length*(neighbors.length-1))/2;
+            const coeff=possibleTriangles>0?triangles/possibleTriangles:0;
+            newAvgClustering+=coeff;
+        });
+        newAvgClustering/=nodes.length;
+        const clusteringError=Math.abs(newAvgClustering-originalAvgClustering)/(originalAvgClustering+0.01);
+        const totalError=degreeError+clusteringError;
+        if(totalError<bestError){
+            bestError=totalError;
+            bestLinks=[...candidateLinks];
+            if(totalError<tolerance)break;
+        }
+    }
+    links=bestLinks;
+    spectralPhase='perturbed';
+    const edgesAdded=links.filter(l=>l.perturbed).length;
+    const edgesKept=links.length-edgesAdded;
+    console.log('✓ Perturbación completada');
+    warningBox.classed('protected',false).classed('anonymous',false).classed('kanon',false).classed('automorph',true);
+    warningTitle.html('🌊 PERTURBACIÓN ESPECTRAL - GRAFO PERTURBADO');
+    let html='<strong>GRAFO PERTURBADO:</strong> Mantenidas: '+edgesKept+' • Añadidas: <span style=\"color:#fff\">'+edgesAdded+'</span> • Total: '+links.length+'<br><br>';
+    html+='<div class=\"metric-row\">';
+    html+='<button onclick=\"calculateDegree()\" class=\"metric-btn btn-degree\">📊 Grado Medio</button>';
+    html+='<div id=\"degreeResult\" class=\"metric-result\"><em>Click para recalcular</em></div>';
+    html+='</div>';
+    html+='<div class=\"metric-row\">';
+    html+='<button onclick=\"calculateClustering()\" class=\"metric-btn btn-clustering\">🔺 Clustering</button>';
+    html+='<div id=\"clusteringResult\" class=\"metric-result result-clustering\"><em>Click para recalcular</em></div>';
+    html+='</div>';
+    html+='<div class=\"metric-row\">';
+    html+='<button onclick=\"calculateBetweenness()\" class=\"metric-btn btn-centrality\">📍 Centralidad</button>';
+    html+='<div id=\"centralityResult\" class=\"metric-result result-centrality\"><em>Click para recalcular</em></div>';
+    html+='</div><br>';
+    html+='<button onclick=\"compareMetrics()\" class=\"metric-btn btn-compare\">📊 COMPARAR MÉTRICAS</button>';
+    html+='<div id=\"comparisonResult\" style=\"margin-top:10px;\"></div>';
+    warningText.html(html);
+    updateGraph();
+}
 function applyEdgePerturbation(){
-    if(fused||clustered||kanonActive||communityActive||clusteringPreservingActive)return;
+    if(fused||clustered||kanonActive||communityActive||clusteringPreservingActive||spectralActive)return;
     perturbActive=true;
     const epsilon=2.5;
     const p_real=Math.exp(epsilon)/(1+Math.exp(epsilon));
@@ -706,10 +1056,11 @@ function applyEdgePerturbation(){
     communityBtn.attr('disabled','disabled');
     clusteringBtn.attr('disabled','disabled');
     kanonBtn.attr('disabled','disabled');
+    spectralBtn.attr('disabled','disabled');
     updateGraph();
 }
 function applyKAnonymity(){
-    if(fused||clustered||perturbActive||communityActive||clusteringPreservingActive)return;
+    if(fused||clustered||perturbActive||communityActive||clusteringPreservingActive||spectralActive)return;
     kanonActive=true;
     const k=3;
     const newLinks=[];
@@ -766,7 +1117,7 @@ function applyKAnonymity(){
     updateGraph();
 }
 function toggleClusters(){
-    if(fused||kanonActive||perturbActive||communityActive||clusteringPreservingActive)return;
+    if(fused||kanonActive||perturbActive||communityActive||clusteringPreservingActive||spectralActive)return;
     clustered=!clustered;
     if(clustered){
         node.transition().duration(1000).attr('fill',d=>colorScale(d.ciudad));
@@ -780,6 +1131,7 @@ function toggleClusters(){
         clusteringBtn.attr('disabled','disabled');
         kanonBtn.attr('disabled','disabled');
         perturbBtn.attr('disabled','disabled');
+        spectralBtn.attr('disabled','disabled');
         fusionTimeout=setTimeout(fusionNodes,5000);
     }else{
         if(fusionTimeout){clearTimeout(fusionTimeout);fusionTimeout=null;}
@@ -818,13 +1170,14 @@ function fusionNodes(){
 }
 function resetSimulation(){
     if(fusionTimeout){clearTimeout(fusionTimeout);fusionTimeout=null;}
-    if(fused||kanonActive||perturbActive||communityActive||clusteringPreservingActive){
+    if(fused||kanonActive||perturbActive||communityActive||clusteringPreservingActive||spectralActive){
         fused=false;
         clustered=false;
         kanonActive=false;
         perturbActive=false;
         communityActive=false;
         clusteringPreservingActive=false;
+        spectralActive=false;
         communities=[];
         nodes=JSON.parse(JSON.stringify(originalNodes));
         links=JSON.parse(JSON.stringify(originalLinks));
@@ -838,6 +1191,7 @@ function resetSimulation(){
         clusterBtn.classed('active',false).html('🏙️ Agrupar por Ciudades').attr('disabled',null);
         communityBtn.classed('active',false).attr('disabled',null);
         clusteringBtn.classed('active',false).attr('disabled',null);
+        spectralBtn.classed('active',false).attr('disabled',null);
         kanonBtn.classed('active',false).attr('disabled',null);
         perturbBtn.classed('active',false).attr('disabled',null);
         updateGraph();
