@@ -60,6 +60,7 @@
         <div class="controls">
             <button onclick="toggleClusters()" id="clusterBtn">🏙️ Agrupar por Ciudades</button>
             <button onclick="detectCommunities()" id="communityBtn">🔍 Detectar Comunidades (Louvain)</button>
+            <button onclick="applyClusteringPreserving()" id="clusteringBtn" class="automorph-btn">🎯 Clustering Preserving Randomization</button>
             <button onclick="applyKAnonymity()" id="kanonBtn" class="kanon-btn">🟣 K-Anonimidad (k=3)</button>
             <button onclick="applyEdgePerturbation()" id="perturbBtn" class="automorph-btn">🔀 Differential Privacy (ε=2.5)</button>
             <button onclick="resetSimulation()">🔄 Reset Vista</button>
@@ -86,6 +87,7 @@ let fused=false;
 let kanonActive=false;
 let perturbActive=false;
 let communityActive=false;
+let clusteringPreservingActive=false;
 let fusionTimeout=null;
 let communities=[];
 const clusterForce=(alpha)=>{
@@ -96,7 +98,7 @@ const clusterForce=(alpha)=>{
             n.vy-=(n.y-center.y)*alpha*0.3;
         });
     }
-    if(communityActive&&communities.length>0){
+    if((communityActive||clusteringPreservingActive)&&communities.length>0){
         communities.forEach((comm,idx)=>{
             const centerX=300+(idx%3)*450;
             const centerY=200+Math.floor(idx/3)*300;
@@ -121,6 +123,7 @@ const warningTitle=d3.select('#warningTitle');
 const warningText=d3.select('#warningText');
 const clusterBtn=d3.select('#clusterBtn');
 const communityBtn=d3.select('#communityBtn');
+const clusteringBtn=d3.select('#clusteringBtn');
 const kanonBtn=d3.select('#kanonBtn');
 const perturbBtn=d3.select('#perturbBtn');
 let isPaused=false;
@@ -131,9 +134,9 @@ function updateGraph(){
     link=linkEnter.merge(link);
     node=node.data(nodes,d=>d.id);
     node.exit().remove();
-    const nodeEnter=node.enter().append('circle').attr('class',d=>d.isSupernode?'supernode':'node').attr('r',d=>d.isSupernode?50:30).attr('fill',d=>{if(d.isSupernode&&d.communityColor)return d.communityColor;if(fused)return colorScale(d.ciudad);if(communityActive&&d.communityColor)return d.communityColor;if(perturbActive)return'#e74c3c';if(kanonActive&&d.degreeGroup!==undefined)return degreeColorScale(d.degreeGroup);if(clustered)return colorScale(d.ciudad);return'#3498db';}).call(d3.drag().on('start',(e,d)=>{if(!e.active)simulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;}).on('end',(e,d)=>{if(!e.active)simulation.alphaTarget(0);d.fx=null;d.fy=null;})).on('mouseover',(e,d)=>{let html='<strong style="font-size:14px">'+d.id+'</strong>';if(d.isSupernode){html+='<br><br>🔒 <strong>Total personas:</strong> '+d.count;html+='<br>📊 <strong>Edad media:</strong> '+d.avgAge.toFixed(1)+' años';if(d.profCounts){html+='<br><br>💼 <strong>Por profesión:</strong>';Object.keys(d.profCounts).sort((a,b)=>d.profCounts[b]-d.profCounts[a]).forEach(prof=>{html+='<br>      '+prof+': '+d.profCounts[prof];});}if(d.cityCounts){html+='<br><br>🏙️ <strong>Por ciudad:</strong>';Object.keys(d.cityCounts).sort((a,b)=>d.cityCounts[b]-d.cityCounts[a]).forEach(city=>{html+='<br>      '+city+': '+d.cityCounts[city];});}if(d.cityConnections){html+='<br><br>🔗 <strong>Conexiones con otras ciudades:</strong>';const cities=['Barcelona','Madrid','Valencia','Sevilla'];cities.forEach(city=>{if(city!==d.ciudad&&d.cityConnections[city]>0){html+='<br>      '+city+': '+d.cityConnections[city];}});}}else{html+='<br>🏙️ Ciudad: '+d.ciudad+'<br>🎂 Edad: '+d.edad+' años<br>💼 Profesión: '+d.profesion;if(communityActive&&d.community!==undefined){html+='<br><br><strong style="color:'+d.communityColor+';font-size:13px">🔍 COMUNIDAD '+(d.community+1)+'</strong>';const comm=communities[d.community];if(comm){html+='<br>🔍 Tamaño: '+comm.size+' personas<br>🔍 Edad media: '+comm.avgAge+' años';}}else if(perturbActive&&d.perturbDegree!==undefined){html+='<br><br><strong style="color:#e74c3c;font-size:13px">🔀 GRADO: '+d.perturbDegree+' conexiones</strong>';html+='<br><strong style="color:#c0392b">🔀 Red perturbada</strong>';}else if(kanonActive&&d.degree!==undefined){html+='<br><br><strong style="color:#9b59b6;font-size:13px">🟣 GRADO: '+d.degree+' conexiones</strong>';if(d.degreeCount!==undefined){html+='<br><strong>🟣 Comparte grado con '+(d.degreeCount-1)+' nodos más</strong>';}}}tooltip.style('opacity',1).html(html).style('left',e.clientX+10+'px').style('top',e.clientY+10+'px');}).on('mousemove',(e)=>tooltip.style('left',e.clientX+10+'px').style('top',e.clientY+10+'px')).on('mouseout',()=>{tooltip.style('opacity',0);node.classed('highlighted',false);});
+    const nodeEnter=node.enter().append('circle').attr('class',d=>d.isSupernode?'supernode':'node').attr('r',d=>d.isSupernode?50:30).attr('fill',d=>{if(d.isSupernode&&d.communityColor)return d.communityColor;if(fused)return colorScale(d.ciudad);if((communityActive||clusteringPreservingActive)&&d.communityColor)return d.communityColor;if(perturbActive)return'#e74c3c';if(kanonActive&&d.degreeGroup!==undefined)return degreeColorScale(d.degreeGroup);if(clustered)return colorScale(d.ciudad);return'#3498db';}).call(d3.drag().on('start',(e,d)=>{if(!e.active)simulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;}).on('end',(e,d)=>{if(!e.active)simulation.alphaTarget(0);d.fx=null;d.fy=null;})).on('mouseover',(e,d)=>{let html='<strong style="font-size:14px">'+d.id+'</strong>';if(d.isSupernode){html+='<br><br>🔒 <strong>Total personas:</strong> '+d.count;html+='<br>📊 <strong>Edad media:</strong> '+d.avgAge.toFixed(1)+' años';if(d.profCounts){html+='<br><br>💼 <strong>Por profesión:</strong>';Object.keys(d.profCounts).sort((a,b)=>d.profCounts[b]-d.profCounts[a]).forEach(prof=>{html+='<br>      '+prof+': '+d.profCounts[prof];});}if(d.cityCounts){html+='<br><br>🏙️ <strong>Por ciudad:</strong>';Object.keys(d.cityCounts).sort((a,b)=>d.cityCounts[b]-d.cityCounts[a]).forEach(city=>{html+='<br>      '+city+': '+d.cityCounts[city];});}if(d.cityConnections){html+='<br><br>🔗 <strong>Conexiones con otras ciudades:</strong>';const cities=['Barcelona','Madrid','Valencia','Sevilla'];cities.forEach(city=>{if(city!==d.ciudad&&d.cityConnections[city]>0){html+='<br>      '+city+': '+d.cityConnections[city];}});}}else{html+='<br>🏙️ Ciudad: '+d.ciudad+'<br>🎂 Edad: '+d.edad+' años<br>💼 Profesión: '+d.profesion;if((communityActive||clusteringPreservingActive)&&d.community!==undefined){html+='<br><br><strong style="color:'+d.communityColor+';font-size:13px">🔍 COMUNIDAD '+(d.community+1)+'</strong>';const comm=communities[d.community];if(comm){html+='<br>🔍 Tamaño: '+comm.size+' personas';if(comm.avgAge)html+='<br>🔍 Edad media: '+comm.avgAge+' años';}}else if(perturbActive&&d.perturbDegree!==undefined){html+='<br><br><strong style="color:#e74c3c;font-size:13px">🔀 GRADO: '+d.perturbDegree+' conexiones</strong>';html+='<br><strong style="color:#c0392b">🔀 Red perturbada</strong>';}else if(kanonActive&&d.degree!==undefined){html+='<br><br><strong style="color:#9b59b6;font-size:13px">🟣 GRADO: '+d.degree+' conexiones</strong>';if(d.degreeCount!==undefined){html+='<br><strong>🟣 Comparte grado con '+(d.degreeCount-1)+' nodos más</strong>';}}}tooltip.style('opacity',1).html(html).style('left',e.clientX+10+'px').style('top',e.clientY+10+'px');}).on('mousemove',(e)=>tooltip.style('left',e.clientX+10+'px').style('top',e.clientY+10+'px')).on('mouseout',()=>{tooltip.style('opacity',0);node.classed('highlighted',false);});
     node=nodeEnter.merge(node);
-    node.attr('fill',d=>{if(d.isSupernode&&d.communityColor)return d.communityColor;if(fused)return colorScale(d.ciudad);if(communityActive&&d.communityColor)return d.communityColor;if(perturbActive)return'#e74c3c';if(kanonActive&&d.degreeGroup!==undefined)return degreeColorScale(d.degreeGroup);if(clustered)return colorScale(d.ciudad);return'#3498db';});
+    node.attr('fill',d=>{if(d.isSupernode&&d.communityColor)return d.communityColor;if(fused)return colorScale(d.ciudad);if((communityActive||clusteringPreservingActive)&&d.communityColor)return d.communityColor;if(perturbActive)return'#e74c3c';if(kanonActive&&d.degreeGroup!==undefined)return degreeColorScale(d.degreeGroup);if(clustered)return colorScale(d.ciudad);return'#3498db';});
     label=label.data(nodes,d=>d.id);
     label.exit().remove();
     const labelEnter=label.enter().append('text').attr('class',d=>d.isSupernode?'supernode-label':'node-label').text(d=>d.id);
@@ -145,7 +148,7 @@ function updateGraph(){
 }
 updateGraph();
 function detectCommunities(){
-    if(fused||kanonActive||perturbActive)return;
+    if(fused||kanonActive||perturbActive||clusteringPreservingActive)return;
     communityActive=true;
     console.log('🔍 DETECTANDO COMUNIDADES CON ALGORITMO LOUVAIN');
     const nodeCommunity={};
@@ -354,6 +357,7 @@ function detectCommunities(){
     warningText.html('🔍 '+communities.length+' comunidades encontradas<br>🔍 Nodos agrupados por conectividad<br>🔍 Mismo COLOR = misma comunidad<br><br>'+statsHTML+'<strong style="color:#27ae60">✓ Estructura comunitaria revelada</strong>');
     communityBtn.classed('active',true).attr('disabled','disabled');
     clusterBtn.attr('disabled','disabled');
+    clusteringBtn.attr('disabled','disabled');
     kanonBtn.attr('disabled','disabled');
     perturbBtn.attr('disabled','disabled');
     updateGraph();
@@ -422,8 +426,232 @@ function detectCommunities(){
         updateGraph();
     },4000);
 }
+function applyClusteringPreserving(){
+    if(fused||clustered||kanonActive||perturbActive||communityActive)return;
+    clusteringPreservingActive=true;
+    console.log('🎯 APLICANDO CLUSTERING PRESERVING RANDOMIZATION');
+    const nodeCommunity={};
+    nodes.forEach(n=>nodeCommunity[n.id]=-1);
+    const adjList={};
+    nodes.forEach(n=>adjList[n.id]=[]);
+    links.forEach(l=>{
+        const s=l.source.id||l.source;
+        const t=l.target.id||l.target;
+        adjList[s].push(t);
+        adjList[t].push(s);
+    });
+    nodes.forEach((n,idx)=>nodeCommunity[n.id]=idx);
+    for(let iter=0;iter<15;iter++){
+        let changed=false;
+        nodes.forEach(n=>{
+            const neighbors=adjList[n.id];
+            const commCounts={};
+            neighbors.forEach(nb=>{
+                const c=nodeCommunity[nb];
+                commCounts[c]=(commCounts[c]||0)+1;
+            });
+            let bestComm=nodeCommunity[n.id];
+            let maxCount=0;
+            Object.keys(commCounts).forEach(c=>{
+                if(commCounts[c]>maxCount){
+                    maxCount=commCounts[c];
+                    bestComm=parseInt(c);
+                }
+            });
+            if(bestComm!==nodeCommunity[n.id]){
+                nodeCommunity[n.id]=bestComm;
+                changed=true;
+            }
+        });
+        if(!changed)break;
+    }
+    const mainComm={};
+    nodes.forEach(n=>{
+        const c=nodeCommunity[n.id];
+        mainComm[c]=(mainComm[c]||0)+1;
+    });
+    let largestComm=-1;
+    let largestSize=0;
+    Object.keys(mainComm).forEach(c=>{
+        if(mainComm[c]>largestSize){
+            largestSize=mainComm[c];
+            largestComm=parseInt(c);
+        }
+    });
+    if(largestSize>6){
+        const largeCommNodes=nodes.filter(n=>nodeCommunity[n.id]===largestComm);
+        const largeCommIds=largeCommNodes.map(n=>n.id);
+        const internalAdjList={};
+        largeCommIds.forEach(id=>internalAdjList[id]=adjList[id].filter(nb=>largeCommIds.includes(nb)));
+        const connectionStrength={};
+        largeCommIds.forEach(id1=>{
+            largeCommIds.forEach(id2=>{
+                if(id1<id2){
+                    const commonNeighbors=internalAdjList[id1].filter(nb=>internalAdjList[id2].includes(nb));
+                    const directConnection=internalAdjList[id1].includes(id2)?1:0;
+                    const strength=directConnection*2+commonNeighbors.length;
+                    connectionStrength[id1+'-'+id2]=strength;
+                }
+            });
+        });
+        const numSubComms=Math.min(4,Math.floor(largestSize/4));
+        const subCommIds=[];
+        for(let i=0;i<numSubComms;i++)subCommIds.push(nodes.length+i);
+        const usedSeeds=new Set();
+        const subCommMembers={};
+        subCommIds.forEach(scId=>subCommMembers[scId]=[]);
+        const sortedByDegree=[...largeCommIds].sort((a,b)=>internalAdjList[b].length-internalAdjList[a].length);
+        for(let i=0;i<numSubComms&&i<sortedByDegree.length;i++){
+            const seed=sortedByDegree[i];
+            usedSeeds.add(seed);
+            subCommMembers[subCommIds[i]].push(seed);
+            nodeCommunity[seed]=subCommIds[i];
+        }
+        const unassigned=largeCommIds.filter(id=>!usedSeeds.has(id));
+        unassigned.forEach(nodeId=>{
+            const scores={};
+            subCommIds.forEach(scId=>{
+                scores[scId]=0;
+                subCommMembers[scId].forEach(memberId=>{
+                    const key=[nodeId,memberId].sort().join('-');
+                    scores[scId]+=(connectionStrength[key]||0);
+                });
+            });
+            let bestComm=subCommIds[0];
+            let bestScore=scores[bestComm];
+            subCommIds.forEach(scId=>{
+                if(scores[scId]>bestScore){
+                    bestScore=scores[scId];
+                    bestComm=scId;
+                }
+            });
+            nodeCommunity[nodeId]=bestComm;
+            subCommMembers[bestComm].push(nodeId);
+        });
+        for(let refineIter=0;refineIter<5;refineIter++){
+            let moved=false;
+            largeCommIds.forEach(nodeId=>{
+                const currentComm=nodeCommunity[nodeId];
+                const scores={};
+                subCommIds.forEach(scId=>{
+                    if(scId===currentComm){
+                        scores[scId]=internalAdjList[nodeId].filter(nb=>nodeCommunity[nb]===currentComm&&nb!==nodeId).length;
+                    }else{
+                        scores[scId]=internalAdjList[nodeId].filter(nb=>nodeCommunity[nb]===scId).length;
+                    }
+                });
+                let bestComm=currentComm;
+                let bestScore=scores[currentComm];
+                subCommIds.forEach(scId=>{
+                    if(scores[scId]>bestScore){
+                        bestScore=scores[scId];
+                        bestComm=scId;
+                    }
+                });
+                if(bestComm!==currentComm){
+                    nodeCommunity[nodeId]=bestComm;
+                    moved=true;
+                }
+            });
+            if(!moved)break;
+        }
+    }
+    const commMap={};
+    nodes.forEach(n=>{
+        const c=nodeCommunity[n.id];
+        if(!commMap[c])commMap[c]=[];
+        commMap[c].push(n.id);
+    });
+    communities=[];
+    const commColors=d3.scaleOrdinal(d3.schemeCategory10);
+    Object.keys(commMap).forEach((c,idx)=>{
+        const members=commMap[c];
+        communities.push({id:idx,members:members,size:members.length,color:commColors(idx)});
+        members.forEach(nodeId=>{
+            const n=nodes.find(x=>x.id===nodeId);
+            if(n){
+                n.community=idx;
+                n.communityColor=commColors(idx);
+            }
+        });
+    });
+    console.log('✓ Detectadas '+communities.length+' comunidades para preservar');
+    const p_intra=0.15;
+    const p_inter=0.02;
+    const newLinks=[];
+    const existingEdges=new Set();
+    links.forEach(l=>{
+        const s=l.source.id||l.source;
+        const t=l.target.id||l.target;
+        const key=[s,t].sort().join('-');
+        existingEdges.add(key);
+    });
+    let intraAdded=0;
+    let intraRemoved=0;
+    let interAdded=0;
+    let interRemoved=0;
+    for(let i=0;i<nodes.length;i++){
+        for(let j=i+1;j<nodes.length;j++){
+            const nodeA=nodes[i].id;
+            const nodeB=nodes[j].id;
+            const commA=nodeCommunity[nodeA];
+            const commB=nodeCommunity[nodeB];
+            const sameComm=(commA===commB);
+            const key=[nodeA,nodeB].sort().join('-');
+            const edgeExists=existingEdges.has(key);
+            const prob=sameComm?p_intra:p_inter;
+            if(edgeExists){
+                if(Math.random()>prob){
+                    newLinks.push({source:nodeA,target:nodeB});
+                }else{
+                    if(sameComm)intraRemoved++;else interRemoved++;
+                }
+            }else{
+                if(Math.random()<prob){
+                    newLinks.push({source:nodeA,target:nodeB,perturbed:true});
+                    if(sameComm)intraAdded++;else interAdded++;
+                }
+            }
+        }
+    }
+    links=newLinks;
+    console.log('✓ Aristas intra-comunidad: +'+intraAdded+' -'+intraRemoved);
+    console.log('✓ Aristas inter-comunidad: +'+interAdded+' -'+interRemoved);
+    console.log('✓ Total aristas: '+links.length);
+    let statsHTML='<strong>PRESERVACIÓN DE CLUSTERING:</strong><br><br>';
+    statsHTML+='<strong style="color:#e67e22">📊 Cambios en aristas:</strong><br>';
+    statsHTML+='   • Intra-comunidad: +'+intraAdded+' / -'+intraRemoved+'<br>';
+    statsHTML+='   • Inter-comunidad: +'+interAdded+' / -'+interRemoved+'<br>';
+    statsHTML+='   • Total: '+links.length+' aristas<br><br>';
+    statsHTML+='<strong style="color:#2ecc71">🎯 Comunidades preservadas: '+communities.length+'</strong><br>';
+    communities.forEach((comm,idx)=>{
+        statsHTML+='<strong style="color:'+comm.color+'">   • Comunidad '+(idx+1)+':</strong> '+comm.size+' nodos<br>';
+    });
+    warningBox.classed('protected',false).classed('anonymous',false).classed('kanon',false).classed('automorph',true);
+    warningTitle.html('🎯 CLUSTERING PRESERVING RANDOMIZATION');
+    warningText.html('🎯 <strong>Preserva estructura comunitaria</strong><br>🎯 Modifica principalmente intra-comunidad<br>🎯 Mantiene organización general<br><br>'+statsHTML+'<br><strong style="color:#27ae60">✓ Equilibrio privacidad-utilidad</strong>');
+    clusteringBtn.classed('active',true).attr('disabled','disabled');
+    clusterBtn.attr('disabled','disabled');
+    communityBtn.attr('disabled','disabled');
+    kanonBtn.attr('disabled','disabled');
+    perturbBtn.attr('disabled','disabled');
+    updateGraph();
+    setTimeout(()=>{
+        console.log('🎯 Revelando comunidades preservadas...');
+        node.transition().duration(1500).attr('fill',d=>d.communityColor);
+        let finalHTML='<strong>COMUNIDADES PRESERVADAS:</strong><br><br>';
+        finalHTML+='<strong style="color:#2ecc71">✓ Las comunidades SE MANTIENEN</strong><br>';
+        finalHTML+='<strong style="color:#2ecc71">✓ A pesar de aristas modificadas</strong><br><br>';
+        communities.forEach((comm,idx)=>{
+            finalHTML+='<strong style="color:'+comm.color+'">📊 Comunidad '+(idx+1)+':</strong> '+comm.size+' nodos<br>';
+        });
+        finalHTML+='<br><strong style="color:#27ae60">🎯 Clustering preservado con éxito</strong>';
+        warningTitle.html('🎯 COMUNIDADES PRESERVADAS');
+        warningText.html(finalHTML);
+    },8000);
+}
 function applyEdgePerturbation(){
-    if(fused||clustered||kanonActive||communityActive)return;
+    if(fused||clustered||kanonActive||communityActive||clusteringPreservingActive)return;
     perturbActive=true;
     const epsilon=2.5;
     const p_real=Math.exp(epsilon)/(1+Math.exp(epsilon));
@@ -476,11 +704,12 @@ function applyEdgePerturbation(){
     perturbBtn.classed('active',true).attr('disabled','disabled');
     clusterBtn.attr('disabled','disabled');
     communityBtn.attr('disabled','disabled');
+    clusteringBtn.attr('disabled','disabled');
     kanonBtn.attr('disabled','disabled');
     updateGraph();
 }
 function applyKAnonymity(){
-    if(fused||clustered||perturbActive||communityActive)return;
+    if(fused||clustered||perturbActive||communityActive||clusteringPreservingActive)return;
     kanonActive=true;
     const k=3;
     const newLinks=[];
@@ -532,11 +761,12 @@ function applyKAnonymity(){
     kanonBtn.classed('active',true).attr('disabled','disabled');
     clusterBtn.attr('disabled','disabled');
     communityBtn.attr('disabled','disabled');
+    clusteringBtn.attr('disabled','disabled');
     perturbBtn.attr('disabled','disabled');
     updateGraph();
 }
 function toggleClusters(){
-    if(fused||kanonActive||perturbActive||communityActive)return;
+    if(fused||kanonActive||perturbActive||communityActive||clusteringPreservingActive)return;
     clustered=!clustered;
     if(clustered){
         node.transition().duration(1000).attr('fill',d=>colorScale(d.ciudad));
@@ -547,6 +777,7 @@ function toggleClusters(){
         warningText.html('🏙️ Agrupados por ciudad<br>🏙️ Identidades individuales menos visibles<br>🏙️ Clusters visuales por ciudad<br>🏙️ Dificulta identificación específica<br><br><strong>4 Ciudades<br>30 personas agrupadas</strong>');
         clusterBtn.classed('active',true).html('👤 Vista Individual').attr('disabled','disabled');
         communityBtn.attr('disabled','disabled');
+        clusteringBtn.attr('disabled','disabled');
         kanonBtn.attr('disabled','disabled');
         perturbBtn.attr('disabled','disabled');
         fusionTimeout=setTimeout(fusionNodes,5000);
@@ -560,6 +791,7 @@ function toggleClusters(){
         warningText.html('❌ Todos los nodos son identificables<br>❌ Nombres, edades y profesiones visibles<br>❌ Relaciones personales expuestas<br>❌ Grados únicos permiten identificación<br><br><strong>30 personas identificables<br>43 conexiones visibles</strong>');
         clusterBtn.classed('active',false).html('🏙️ Agrupar por Ciudades').attr('disabled',null);
         communityBtn.attr('disabled',null);
+        clusteringBtn.attr('disabled',null);
         kanonBtn.attr('disabled',null);
         perturbBtn.attr('disabled',null);
     }
@@ -586,12 +818,13 @@ function fusionNodes(){
 }
 function resetSimulation(){
     if(fusionTimeout){clearTimeout(fusionTimeout);fusionTimeout=null;}
-    if(fused||kanonActive||perturbActive||communityActive){
+    if(fused||kanonActive||perturbActive||communityActive||clusteringPreservingActive){
         fused=false;
         clustered=false;
         kanonActive=false;
         perturbActive=false;
         communityActive=false;
+        clusteringPreservingActive=false;
         communities=[];
         nodes=JSON.parse(JSON.stringify(originalNodes));
         links=JSON.parse(JSON.stringify(originalLinks));
@@ -604,6 +837,7 @@ function resetSimulation(){
         warningText.html('❌ Todos los nodos son identificables<br>❌ Nombres, edades y profesiones visibles<br>❌ Relaciones personales expuestas<br>❌ Grados únicos permiten identificación<br><br><strong>30 personas identificables<br>43 conexiones visibles</strong>');
         clusterBtn.classed('active',false).html('🏙️ Agrupar por Ciudades').attr('disabled',null);
         communityBtn.classed('active',false).attr('disabled',null);
+        clusteringBtn.classed('active',false).attr('disabled',null);
         kanonBtn.classed('active',false).attr('disabled',null);
         perturbBtn.classed('active',false).attr('disabled',null);
         updateGraph();
