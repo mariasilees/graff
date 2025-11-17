@@ -131,9 +131,9 @@ function updateGraph(){
     link=linkEnter.merge(link);
     node=node.data(nodes,d=>d.id);
     node.exit().remove();
-    const nodeEnter=node.enter().append('circle').attr('class',d=>d.isSupernode?'supernode':'node').attr('r',d=>d.isSupernode?50:30).attr('fill',d=>{if(fused)return colorScale(d.ciudad);if(communityActive&&d.communityColor)return d.communityColor;if(perturbActive)return'#e74c3c';if(kanonActive&&d.degreeGroup!==undefined)return degreeColorScale(d.degreeGroup);if(clustered)return colorScale(d.ciudad);return'#3498db';}).call(d3.drag().on('start',(e,d)=>{if(!e.active)simulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;}).on('end',(e,d)=>{if(!e.active)simulation.alphaTarget(0);d.fx=null;d.fy=null;})).on('mouseover',(e,d)=>{let html='<strong style="font-size:14px">'+d.id+'</strong>';if(d.isSupernode){html+='<br><br>🏙️ <strong>Total personas:</strong> '+d.count;html+='<br>📊 <strong>Edad media:</strong> '+d.avgAge.toFixed(1)+' años';if(d.cityConnections){html+='<br><br>🔗 <strong>Conexiones con otras ciudades:</strong>';const cities=['Barcelona','Madrid','Valencia','Sevilla'];cities.forEach(city=>{if(city!==d.ciudad&&d.cityConnections[city]>0){html+='<br>      '+city+': '+d.cityConnections[city];}});}html+='<br><br>💼 <strong>Por profesión:</strong>';const profCounts={};d.professions.forEach(p=>{profCounts[p]=(profCounts[p]||0)+1;});Object.keys(profCounts).sort((a,b)=>profCounts[b]-profCounts[a]).forEach(prof=>{html+='<br>      '+prof+': '+profCounts[prof];});}else{html+='<br>🏙️ Ciudad: '+d.ciudad+'<br>🎂 Edad: '+d.edad+' años<br>💼 Profesión: '+d.profesion;if(communityActive&&d.community!==undefined){html+='<br><br><strong style="color:'+d.communityColor+';font-size:13px">🔍 COMUNIDAD '+(d.community+1)+'</strong>';const comm=communities[d.community];if(comm){html+='<br>🔍 Tamaño: '+comm.size+' personas<br>🔍 Edad media: '+comm.avgAge+' años';}}else if(perturbActive&&d.perturbDegree!==undefined){html+='<br><br><strong style="color:#e74c3c;font-size:13px">🔀 GRADO: '+d.perturbDegree+' conexiones</strong>';html+='<br><strong style="color:#c0392b">🔀 Red perturbada</strong>';}else if(kanonActive&&d.degree!==undefined){html+='<br><br><strong style="color:#9b59b6;font-size:13px">🟣 GRADO: '+d.degree+' conexiones</strong>';if(d.degreeCount!==undefined){html+='<br><strong>🟣 Comparte grado con '+(d.degreeCount-1)+' nodos más</strong>';}}}tooltip.style('opacity',1).html(html).style('left',e.clientX+10+'px').style('top',e.clientY+10+'px');}).on('mousemove',(e)=>tooltip.style('left',e.clientX+10+'px').style('top',e.clientY+10+'px')).on('mouseout',()=>{tooltip.style('opacity',0);node.classed('highlighted',false);});
+    const nodeEnter=node.enter().append('circle').attr('class',d=>d.isSupernode?'supernode':'node').attr('r',d=>d.isSupernode?50:30).attr('fill',d=>{if(d.isSupernode&&d.communityColor)return d.communityColor;if(fused)return colorScale(d.ciudad);if(communityActive&&d.communityColor)return d.communityColor;if(perturbActive)return'#e74c3c';if(kanonActive&&d.degreeGroup!==undefined)return degreeColorScale(d.degreeGroup);if(clustered)return colorScale(d.ciudad);return'#3498db';}).call(d3.drag().on('start',(e,d)=>{if(!e.active)simulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;}).on('end',(e,d)=>{if(!e.active)simulation.alphaTarget(0);d.fx=null;d.fy=null;})).on('mouseover',(e,d)=>{let html='<strong style="font-size:14px">'+d.id+'</strong>';if(d.isSupernode){html+='<br><br>🔒 <strong>Total personas:</strong> '+d.count;html+='<br>📊 <strong>Edad media:</strong> '+d.avgAge.toFixed(1)+' años';if(d.profCounts){html+='<br><br>💼 <strong>Por profesión:</strong>';Object.keys(d.profCounts).sort((a,b)=>d.profCounts[b]-d.profCounts[a]).forEach(prof=>{html+='<br>      '+prof+': '+d.profCounts[prof];});}if(d.cityCounts){html+='<br><br>🏙️ <strong>Por ciudad:</strong>';Object.keys(d.cityCounts).sort((a,b)=>d.cityCounts[b]-d.cityCounts[a]).forEach(city=>{html+='<br>      '+city+': '+d.cityCounts[city];});}if(d.cityConnections){html+='<br><br>🔗 <strong>Conexiones con otras ciudades:</strong>';const cities=['Barcelona','Madrid','Valencia','Sevilla'];cities.forEach(city=>{if(city!==d.ciudad&&d.cityConnections[city]>0){html+='<br>      '+city+': '+d.cityConnections[city];}});}}else{html+='<br>🏙️ Ciudad: '+d.ciudad+'<br>🎂 Edad: '+d.edad+' años<br>💼 Profesión: '+d.profesion;if(communityActive&&d.community!==undefined){html+='<br><br><strong style="color:'+d.communityColor+';font-size:13px">🔍 COMUNIDAD '+(d.community+1)+'</strong>';const comm=communities[d.community];if(comm){html+='<br>🔍 Tamaño: '+comm.size+' personas<br>🔍 Edad media: '+comm.avgAge+' años';}}else if(perturbActive&&d.perturbDegree!==undefined){html+='<br><br><strong style="color:#e74c3c;font-size:13px">🔀 GRADO: '+d.perturbDegree+' conexiones</strong>';html+='<br><strong style="color:#c0392b">🔀 Red perturbada</strong>';}else if(kanonActive&&d.degree!==undefined){html+='<br><br><strong style="color:#9b59b6;font-size:13px">🟣 GRADO: '+d.degree+' conexiones</strong>';if(d.degreeCount!==undefined){html+='<br><strong>🟣 Comparte grado con '+(d.degreeCount-1)+' nodos más</strong>';}}}tooltip.style('opacity',1).html(html).style('left',e.clientX+10+'px').style('top',e.clientY+10+'px');}).on('mousemove',(e)=>tooltip.style('left',e.clientX+10+'px').style('top',e.clientY+10+'px')).on('mouseout',()=>{tooltip.style('opacity',0);node.classed('highlighted',false);});
     node=nodeEnter.merge(node);
-    node.attr('fill',d=>{if(fused)return colorScale(d.ciudad);if(communityActive&&d.communityColor)return d.communityColor;if(perturbActive)return'#e74c3c';if(kanonActive&&d.degreeGroup!==undefined)return degreeColorScale(d.degreeGroup);if(clustered)return colorScale(d.ciudad);return'#3498db';});
+    node.attr('fill',d=>{if(d.isSupernode&&d.communityColor)return d.communityColor;if(fused)return colorScale(d.ciudad);if(communityActive&&d.communityColor)return d.communityColor;if(perturbActive)return'#e74c3c';if(kanonActive&&d.degreeGroup!==undefined)return degreeColorScale(d.degreeGroup);if(clustered)return colorScale(d.ciudad);return'#3498db';});
     label=label.data(nodes,d=>d.id);
     label.exit().remove();
     const labelEnter=label.enter().append('text').attr('class',d=>d.isSupernode?'supernode-label':'node-label').text(d=>d.id);
@@ -199,45 +199,97 @@ function detectCommunities(){
         }
     });
     if(largestSize>6){
+        console.log('🔍 Subdividiendo comunidad grande ('+largestSize+' nodos)...');
         const largeCommNodes=nodes.filter(n=>nodeCommunity[n.id]===largestComm);
         const largeCommIds=largeCommNodes.map(n=>n.id);
-        for(let subIter=0;subIter<10;subIter++){
-            let improved=false;
-            largeCommIds.forEach(nodeId=>{
-                const currentComm=nodeCommunity[nodeId];
-                const sameCommNeighbors=adjList[nodeId].filter(nb=>nodeCommunity[nb]===currentComm);
-                const diffCommNeighbors=adjList[nodeId].filter(nb=>largeCommIds.includes(nb)&&nodeCommunity[nb]!==currentComm);
-                if(diffCommNeighbors.length>sameCommNeighbors.length){
-                    const commCounts={};
-                    diffCommNeighbors.forEach(nb=>{
-                        const c=nodeCommunity[nb];
-                        commCounts[c]=(commCounts[c]||0)+1;
-                    });
-                    let bestComm=currentComm;
-                    let maxCount=sameCommNeighbors.length;
-                    Object.keys(commCounts).forEach(c=>{
-                        if(commCounts[c]>maxCount){
-                            maxCount=commCounts[c];
-                            bestComm=parseInt(c);
-                        }
-                    });
-                    if(bestComm!==currentComm){
-                        nodeCommunity[nodeId]=bestComm;
-                        improved=true;
-                    }
+        const internalAdjList={};
+        largeCommIds.forEach(id=>{
+            internalAdjList[id]=adjList[id].filter(nb=>largeCommIds.includes(nb));
+        });
+        const connectionStrength={};
+        largeCommIds.forEach(id1=>{
+            largeCommIds.forEach(id2=>{
+                if(id1<id2){
+                    const commonNeighbors=internalAdjList[id1].filter(nb=>internalAdjList[id2].includes(nb));
+                    const directConnection=internalAdjList[id1].includes(id2)?1:0;
+                    const strength=directConnection*2+commonNeighbors.length;
+                    connectionStrength[id1+'-'+id2]=strength;
                 }
             });
-            if(!improved)break;
+        });
+        const numSubComms=Math.min(4,Math.floor(largestSize/4));
+        const subCommIds=[];
+        for(let i=0;i<numSubComms;i++){
+            subCommIds.push(nodes.length+i);
         }
-        const finalComms={};
+        const usedSeeds=new Set();
+        const subCommMembers={};
+        subCommIds.forEach(scId=>subCommMembers[scId]=[]);
+        const sortedByDegree=[...largeCommIds].sort((a,b)=>internalAdjList[b].length-internalAdjList[a].length);
+        for(let i=0;i<numSubComms&&i<sortedByDegree.length;i++){
+            const seed=sortedByDegree[i];
+            usedSeeds.add(seed);
+            subCommMembers[subCommIds[i]].push(seed);
+            nodeCommunity[seed]=subCommIds[i];
+        }
+        const unassigned=largeCommIds.filter(id=>!usedSeeds.has(id));
+        unassigned.forEach(nodeId=>{
+            const scores={};
+            subCommIds.forEach(scId=>{
+                scores[scId]=0;
+                subCommMembers[scId].forEach(memberId=>{
+                    const key=[nodeId,memberId].sort().join('-');
+                    scores[scId]+=(connectionStrength[key]||0);
+                });
+            });
+            let bestComm=subCommIds[0];
+            let bestScore=scores[bestComm];
+            subCommIds.forEach(scId=>{
+                if(scores[scId]>bestScore){
+                    bestScore=scores[scId];
+                    bestComm=scId;
+                }
+            });
+            nodeCommunity[nodeId]=bestComm;
+            subCommMembers[bestComm].push(nodeId);
+        });
+        for(let refineIter=0;refineIter<5;refineIter++){
+            let moved=false;
+            largeCommIds.forEach(nodeId=>{
+                const currentComm=nodeCommunity[nodeId];
+                const scores={};
+                subCommIds.forEach(scId=>{
+                    if(scId===currentComm){
+                        scores[scId]=internalAdjList[nodeId].filter(nb=>nodeCommunity[nb]===currentComm&&nb!==nodeId).length;
+                    }else{
+                        scores[scId]=internalAdjList[nodeId].filter(nb=>nodeCommunity[nb]===scId).length;
+                    }
+                });
+                let bestComm=currentComm;
+                let bestScore=scores[currentComm];
+                subCommIds.forEach(scId=>{
+                    if(scores[scId]>bestScore){
+                        bestScore=scores[scId];
+                        bestComm=scId;
+                    }
+                });
+                if(bestComm!==currentComm){
+                    nodeCommunity[nodeId]=bestComm;
+                    moved=true;
+                }
+            });
+            if(!moved)break;
+        }
+        const finalSubComms={};
         largeCommIds.forEach(id=>{
             const c=nodeCommunity[id];
-            if(!finalComms[c])finalComms[c]=[];
-            finalComms[c].push(id);
+            if(!finalSubComms[c])finalSubComms[c]=0;
+            finalSubComms[c]++;
         });
-        if(Object.keys(finalComms).length>1){
-            console.log('  Subdividiendo comunidad grande en '+Object.keys(finalComms).length+' subcomunidades con mejor modularidad');
-        }
+        console.log('  ✓ Subdividida en '+Object.keys(finalSubComms).length+' subcomunidades:');
+        Object.keys(finalSubComms).forEach(c=>{
+            console.log('    - Subcomunidad: '+finalSubComms[c]+' nodos');
+        });
     }
     const commMap={};
     nodes.forEach(n=>{
@@ -305,6 +357,70 @@ function detectCommunities(){
     kanonBtn.attr('disabled','disabled');
     perturbBtn.attr('disabled','disabled');
     updateGraph();
+    setTimeout(()=>{
+        console.log('🔒 Aplicando generalización de comunidades...');
+        const supernodes=[];
+        communities.forEach((comm,idx)=>{
+            const memberNodes=comm.members.map(id=>originalNodes.find(x=>x.id===id));
+            const avgAge=(memberNodes.reduce((sum,n)=>sum+n.edad,0)/memberNodes.length).toFixed(1);
+            const profCounts={};
+            memberNodes.forEach(n=>{profCounts[n.profesion]=(profCounts[n.profesion]||0)+1;});
+            const topProf=Object.keys(profCounts).sort((a,b)=>profCounts[b]-profCounts[a])[0];
+            const cityCounts={};
+            memberNodes.forEach(n=>{cityCounts[n.ciudad]=(cityCounts[n.ciudad]||0)+1;});
+            const topCity=Object.keys(cityCounts).sort((a,b)=>cityCounts[b]-cityCounts[a])[0];
+            supernodes.push({
+                id:'Comunidad '+(idx+1),
+                isSupernode:true,
+                ciudad:topCity,
+                count:comm.size,
+                avgAge:parseFloat(avgAge),
+                professions:Object.keys(profCounts),
+                profCounts:profCounts,
+                cityCounts:cityCounts,
+                members:comm.members,
+                internalEdges:comm.internalEdges,
+                externalEdges:comm.externalEdges,
+                color:comm.color,
+                communityColor:comm.color
+            });
+        });
+        const intercommunityLinks=[];
+        const addedPairs=new Set();
+        links.forEach(l=>{
+            const s=l.source.id||l.source;
+            const t=l.target.id||l.target;
+            const sComm=communities.findIndex(c=>c.members.includes(s));
+            const tComm=communities.findIndex(c=>c.members.includes(t));
+            if(sComm!==tComm&&sComm>=0&&tComm>=0){
+                const key=[sComm,tComm].sort().join('-');
+                if(!addedPairs.has(key)){
+                    addedPairs.add(key);
+                    intercommunityLinks.push({
+                        source:'Comunidad '+(sComm+1),
+                        target:'Comunidad '+(tComm+1)
+                    });
+                }
+            }
+        });
+        nodes=supernodes;
+        links=intercommunityLinks;
+        simulation.force('charge',d3.forceManyBody().strength(-400));
+        simulation.force('collision',d3.forceCollide().radius(60));
+        simulation.force('link').distance(250);
+        let generalHTML='<strong>COMUNIDADES GENERALIZADAS:</strong><br><br>';
+        supernodes.forEach((sn,idx)=>{
+            generalHTML+='<strong style="color:'+sn.color+'">🔒 '+sn.id+'</strong><br>';
+            generalHTML+='   • Personas: '+sn.count+'<br>';
+            generalHTML+='   • Edad media: '+sn.avgAge+' años<br>';
+            generalHTML+='   • Ciudad principal: '+Object.keys(sn.cityCounts).sort((a,b)=>sn.cityCounts[b]-sn.cityCounts[a])[0]+'<br>';
+            generalHTML+='   • Profesión principal: '+Object.keys(sn.profCounts).sort((a,b)=>sn.profCounts[b]-sn.profCounts[a])[0]+'<br><br>';
+        });
+        warningBox.classed('protected',false).classed('anonymous',true).classed('kanon',false).classed('automorph',false);
+        warningTitle.html('🔒 GENERALIZACIÓN DE COMUNIDADES');
+        warningText.html('🔒 Identidades individuales eliminadas<br>🔒 Solo promedios y agregados<br>🔒 '+supernodes.length+' supernodos comunitarios<br>🔒 '+intercommunityLinks.length+' conexiones entre comunidades<br><br>'+generalHTML+'<strong style="color:#27ae60">✓ Máxima privacidad garantizada</strong>');
+        updateGraph();
+    },4000);
 }
 function applyEdgePerturbation(){
     if(fused||clustered||kanonActive||communityActive)return;
