@@ -1,11 +1,13 @@
-cd "C:\Users\Usuario\Desktop\CARRERA DADES\TERCERO CARRERA\PRIVACITAT\PROJECTE"; @"
+# Script para crear el archivo grafo_interactivo.html
+
+@"
 <!DOCTYPE html>
-<html lang=`"es`">
+<html lang="es">
 <head>
-    <meta charset=`"UTF-8`">
-    <meta name=`"viewport`" content=`"width=device-width, initial-scale=1.0`">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grafo Interactivo - Red Social</title>
-    <script src=`"https://d3js.org/d3.v7.min.js`"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: white; }
         h1 { text-align: center; color: #333; margin-bottom: 10px; }
@@ -13,50 +15,65 @@ cd "C:\Users\Usuario\Desktop\CARRERA DADES\TERCERO CARRERA\PRIVACITAT\PROJECTE";
         #graph { border: 2px solid #333; border-radius: 8px; background: white; }
         .node { cursor: pointer; stroke: white; stroke-width: 2px; }
         .supernode { cursor: pointer; stroke: white; stroke-width: 3px; }
+        .node.highlighted { stroke: #f39c12; stroke-width: 5px; }
         .link { stroke: #888; stroke-opacity: 0.6; stroke-width: 2px; }
-        .node-label { font-size: 11px; font-weight: bold; text-anchor: middle; pointer-events: none; fill: white; }
+        .link.added { stroke: #9b59b6; stroke-width: 3px; stroke-dasharray: 5,5; stroke-opacity: 0.7; }
+        .link.symmetric { stroke: #e74c3c; stroke-width: 3px; stroke-dasharray: 3,3; stroke-opacity: 0.7; }
+        .node-label { font-size: 10px; font-weight: bold; text-anchor: middle; pointer-events: none; fill: white; }
         .supernode-label { font-size: 14px; font-weight: bold; text-anchor: middle; pointer-events: none; fill: white; }
         .cluster-label { font-size: 16px; font-weight: bold; text-anchor: middle; pointer-events: none; opacity: 0; transition: opacity 0.5s; }
-        .tooltip { position: fixed; padding: 12px; background: yellow; border: 2px solid orange; border-radius: 8px; pointer-events: none; opacity: 0; font-size: 11px; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 2000; max-width: 300px; }
-        .warning-box { background: rgba(231, 76, 60, 0.9); border: 3px solid darkred; border-radius: 10px; padding: 15px; margin: 20px auto; width: 280px; font-size: 12px; font-weight: bold; transition: all 0.5s; }
+        .tooltip { position: fixed; padding: 12px; background: yellow; border: 2px solid orange; border-radius: 8px; pointer-events: none; opacity: 0; font-size: 11px; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 2000; max-width: 400px; }
+        .warning-box { background: rgba(231, 76, 60, 0.9); border: 3px solid darkred; border-radius: 10px; padding: 15px; margin: 20px auto; width: 450px; font-size: 12px; font-weight: bold; transition: all 0.5s; }
         .warning-box.protected { background: rgba(46, 204, 113, 0.9); border: 3px solid green; }
+        .warning-box.kanon { background: rgba(155, 89, 182, 0.9); border: 3px solid #8e44ad; }
+        .warning-box.automorph { background: rgba(231, 76, 60, 0.9); border: 3px solid #c0392b; }
         .warning-box.anonymous { background: rgba(52, 152, 219, 0.9); border: 3px solid #2980b9; }
         .warning-box h3 { margin: 0 0 10px 0; color: #c0392b; font-size: 14px; }
         .warning-box.protected h3 { color: #27ae60; }
+        .warning-box.kanon h3 { color: #8e44ad; }
+        .warning-box.automorph h3 { color: #c0392b; }
         .warning-box.anonymous h3 { color: #2980b9; }
         .controls { text-align: center; margin: 15px 0; }
         button { padding: 10px 20px; margin: 0 5px; font-size: 14px; font-weight: bold; border: 2px solid #3498db; background: #3498db; color: white; border-radius: 5px; cursor: pointer; transition: background 0.3s; }
         button:hover { background: #2980b9; }
         button.active { background: #27ae60; border-color: #27ae60; }
+        button.kanon-btn { border-color: #9b59b6; background: #9b59b6; }
+        button.kanon-btn:hover { background: #8e44ad; }
+        button.automorph-btn { border-color: #e74c3c; background: #e74c3c; }
+        button.automorph-btn:hover { background: #c0392b; }
     </style>
 </head>
 <body>
-    <div class=`"container`">
+    <div class="container">
         <h1>GRAFO INTERACTIVO: Red Social de 30 Personas</h1>
-        <div class=`"warning-box`" id=`"warningBox`">
-            <h3 id=`"warningTitle`">⚠️ RIESGO DE PRIVACIDAD</h3>
-            <span id=`"warningText`">
+        <div class="warning-box" id="warningBox">
+            <h3 id="warningTitle">⚠️ RIESGO DE PRIVACIDAD</h3>
+            <span id="warningText">
                 ❌ Todos los nodos son identificables<br>
                 ❌ Nombres, edades y profesiones visibles<br>
                 ❌ Relaciones personales expuestas<br>
-                ❌ Fácil seguimiento individual<br><br>
-                <strong>30 personas identificables<br>45 conexiones visibles</strong>
+                ❌ Grados únicos permiten identificación<br><br>
+                <strong>30 personas identificables<br>43 conexiones visibles</strong>
             </span>
         </div>
-        <div class=`"controls`">
-            <button onclick=`"toggleClusters()`" id=`"clusterBtn`">🏙️ Agrupar por Ciudades</button>
-            <button onclick=`"resetSimulation()`">🔄 Reset Vista</button>
-            <button onclick=`"pauseSimulation()`">⏸️ Pausar/Reanudar</button>
+        <div class="controls">
+            <button onclick="toggleClusters()" id="clusterBtn">🏙️ Agrupar por Ciudades</button>
+            <button onclick="applyKAnonymity()" id="kanonBtn" class="kanon-btn">🟣 K-Anonimidad (k=3)</button>
+            <button onclick="applyAutomorphism()" id="automorphBtn" class="automorph-btn">🔺 K-Automorfismo (k=3)</button>
+            <button onclick="resetSimulation()">🔄 Reset Vista</button>
+            <button onclick="pauseSimulation()">⏸️ Pausar/Reanudar</button>
         </div>
-        <svg id=`"graph`" width=`"1400`" height=`"800`"></svg>
-        <div class=`"tooltip`" id=`"tooltip`"></div>
+        <svg id="graph" width="1400" height="800"></svg>
+        <div class="tooltip" id="tooltip"></div>
     </div>
     <script>
 const originalNodes=[{id:'Ana',edad:22,ciudad:'Barcelona',profesion:'Estudiante'},{id:'Luis',edad:20,ciudad:'Madrid',profesion:'Estudiante'},{id:'María',edad:23,ciudad:'Barcelona',profesion:'Becaria'},{id:'Carlos',edad:21,ciudad:'Valencia',profesion:'Estudiante'},{id:'Sofia',edad:24,ciudad:'Madrid',profesion:'Diseñadora'},{id:'Diego',edad:19,ciudad:'Sevilla',profesion:'Estudiante'},{id:'Laura',edad:22,ciudad:'Barcelona',profesion:'Becaria'},{id:'Pedro',edad:25,ciudad:'Madrid',profesion:'Programador'},{id:'Elena',edad:20,ciudad:'Valencia',profesion:'Estudiante'},{id:'Javier',edad:23,ciudad:'Barcelona',profesion:'Ingeniero'},{id:'Roberto',edad:35,ciudad:'Madrid',profesion:'Arquitecto'},{id:'Carmen',edad:38,ciudad:'Barcelona',profesion:'Abogada'},{id:'Fernando',edad:42,ciudad:'Valencia',profesion:'Médico'},{id:'Isabel',edad:33,ciudad:'Sevilla',profesion:'Profesora'},{id:'Miguel',edad:40,ciudad:'Madrid',profesion:'Empresario'},{id:'Patricia',edad:36,ciudad:'Barcelona',profesion:'Enfermera'},{id:'Andrés',edad:44,ciudad:'Valencia',profesion:'Ingeniero'},{id:'Beatriz',edad:31,ciudad:'Madrid',profesion:'Periodista'},{id:'Jorge',edad:39,ciudad:'Barcelona',profesion:'Contador'},{id:'Rosa',edad:37,ciudad:'Sevilla',profesion:'Farmacéutica'},{id:'Antonio',edad:65,ciudad:'Madrid',profesion:'Jubilado'},{id:'Dolores',edad:68,ciudad:'Barcelona',profesion:'Jubilada'},{id:'Francisco',edad:62,ciudad:'Valencia',profesion:'Jubilado'},{id:'Teresa',edad:70,ciudad:'Sevilla',profesion:'Jubilada'},{id:'José',edad:66,ciudad:'Madrid',profesion:'Jubilado'},{id:'Pilar',edad:64,ciudad:'Barcelona',profesion:'Jubilada'},{id:'Manuel',edad:69,ciudad:'Valencia',profesion:'Jubilado'},{id:'Concepción',edad:63,ciudad:'Madrid',profesion:'Jubilada'},{id:'Ramón',edad:67,ciudad:'Barcelona',profesion:'Jubilado'},{id:'Mercedes',edad:71,ciudad:'Sevilla',profesion:'Jubilada'}];
-const originalLinks=[{source:'Ana',target:'Luis'},{source:'Ana',target:'María'},{source:'Luis',target:'María'},{source:'Carlos',target:'Sofia'},{source:'Diego',target:'Laura'},{source:'Pedro',target:'Elena'},{source:'Sofia',target:'Javier'},{source:'Laura',target:'Carlos'},{source:'Roberto',target:'Carmen'},{source:'Fernando',target:'Miguel'},{source:'Patricia',target:'Isabel'},{source:'Jorge',target:'Beatriz'},{source:'Andrés',target:'Rosa'},{source:'Miguel',target:'Jorge'},{source:'Antonio',target:'José'},{source:'Dolores',target:'Pilar'},{source:'Francisco',target:'Manuel'},{source:'Teresa',target:'Mercedes'},{source:'Ramón',target:'Concepción'},{source:'José',target:'Manuel'},{source:'Ana',target:'Roberto'},{source:'Luis',target:'Carmen'},{source:'María',target:'Patricia'},{source:'Carlos',target:'Fernando'},{source:'Sofia',target:'Miguel'},{source:'Diego',target:'Isabel'},{source:'Laura',target:'Andrés'},{source:'Pedro',target:'Beatriz'},{source:'Elena',target:'Jorge'},{source:'Javier',target:'Rosa'},{source:'Roberto',target:'Antonio'},{source:'Carmen',target:'Dolores'},{source:'Fernando',target:'Francisco'},{source:'Isabel',target:'Teresa'},{source:'Miguel',target:'José'},{source:'Patricia',target:'Pilar'},{source:'Andrés',target:'Manuel'},{source:'Beatriz',target:'Concepción'},{source:'Jorge',target:'Ramón'},{source:'Rosa',target:'Mercedes'},{source:'Ana',target:'Dolores'},{source:'Luis',target:'Antonio'},{source:'María',target:'Pilar'},{source:'Carlos',target:'José'},{source:'Sofia',target:'Teresa'},{source:'Diego',target:'Francisco'}];
+const originalLinks=[{source:'Ana',target:'Luis'},{source:'Ana',target:'María'},{source:'Ana',target:'Roberto'},{source:'Ana',target:'Carmen'},{source:'Ana',target:'Dolores'},{source:'Ana',target:'Patricia'},{source:'Ana',target:'Javier'},{source:'Ana',target:'Jorge'},{source:'Luis',target:'María'},{source:'Luis',target:'Carmen'},{source:'Luis',target:'Roberto'},{source:'Luis',target:'Antonio'},{source:'Luis',target:'José'},{source:'Luis',target:'Concepción'},{source:'Luis',target:'Miguel'},{source:'María',target:'Patricia'},{source:'María',target:'Dolores'},{source:'María',target:'Pilar'},{source:'María',target:'Ramón'},{source:'María',target:'Jorge'},{source:'Carlos',target:'Sofia'},{source:'Carlos',target:'Fernando'},{source:'Carlos',target:'Elena'},{source:'Carlos',target:'Manuel'},{source:'Carlos',target:'Francisco'},{source:'Sofia',target:'Miguel'},{source:'Sofia',target:'Beatriz'},{source:'Sofia',target:'Antonio'},{source:'Diego',target:'Laura'},{source:'Diego',target:'Isabel'},{source:'Diego',target:'Teresa'},{source:'Laura',target:'Patricia'},{source:'Pedro',target:'Beatriz'},{source:'Pedro',target:'Antonio'},{source:'Elena',target:'Jorge'},{source:'Roberto',target:'Carmen'},{source:'Fernando',target:'Miguel'},{source:'Patricia',target:'Isabel'},{source:'Andrés',target:'Rosa'},{source:'Dolores',target:'Pilar'},{source:'Francisco',target:'Manuel'},{source:'Teresa',target:'Mercedes'},{source:'Ramón',target:'Concepción'}];
 let nodes=JSON.parse(JSON.stringify(originalNodes));
 let links=JSON.parse(JSON.stringify(originalLinks));
 const colorScale=d3.scaleOrdinal().domain(['Barcelona','Madrid','Valencia','Sevilla']).range(['#e74c3c','#3498db','#2ecc71','#f39c12']);
+const degreeColorScale=d3.scaleOrdinal().range(['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#e67e22','#1abc9c','#34495e']);
+const automorphColorScale=d3.scaleOrdinal().range(['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#e67e22','#1abc9c','#34495e']);
 const clusterCenters={Barcelona:{x:300,y:400},Madrid:{x:700,y:200},Valencia:{x:1100,y:400},Sevilla:{x:700,y:600}};
 const svg=d3.select('#graph'),width=+svg.attr('width'),height=+svg.attr('height');
 const zoom=d3.zoom().scaleExtent([0.5,3]).on('zoom',(e)=>g.attr('transform',e.transform));
@@ -64,8 +81,26 @@ svg.call(zoom);
 const g=svg.append('g');
 let clustered=false;
 let fused=false;
+let kanonActive=false;
+let automorphActive=false;
 let fusionTimeout=null;
-const clusterForce=(alpha)=>{if(clustered&&!fused){nodes.forEach(n=>{const center=clusterCenters[n.ciudad];n.vx-=(n.x-center.x)*alpha*0.3;n.vy-=(n.y-center.y)*alpha*0.3;});}};
+let groupPositions=[];
+const clusterForce=(alpha)=>{
+    if(clustered&&!fused&&!kanonActive&&!automorphActive){
+        nodes.forEach(n=>{
+            const center=clusterCenters[n.ciudad];
+            n.vx-=(n.x-center.x)*alpha*0.3;
+            n.vy-=(n.y-center.y)*alpha*0.3;
+        });
+    }else if(automorphActive&&groupPositions.length>0){
+        nodes.forEach(n=>{
+            if(n.targetX!==undefined&&n.targetY!==undefined){
+                n.vx+=(n.targetX-n.x)*alpha*0.5;
+                n.vy+=(n.targetY-n.y)*alpha*0.5;
+            }
+        });
+    }
+};
 let simulation=d3.forceSimulation(nodes).force('link',d3.forceLink(links).id(d=>d.id).distance(90)).force('charge',d3.forceManyBody().strength(-250)).force('center',d3.forceCenter(width/2,height/2)).force('cluster',clusterForce).force('collision',d3.forceCollide().radius(35));
 let link=g.append('g').selectAll('line');
 let node=g.append('g').selectAll('circle');
@@ -76,15 +111,19 @@ const warningBox=d3.select('#warningBox');
 const warningTitle=d3.select('#warningTitle');
 const warningText=d3.select('#warningText');
 const clusterBtn=d3.select('#clusterBtn');
+const kanonBtn=d3.select('#kanonBtn');
+const automorphBtn=d3.select('#automorphBtn');
 let isPaused=false;
 function updateGraph(){
-    link=link.data(links,d=>d.source.id+'-'+d.target.id);
+    link=link.data(links,d=>(d.source.id||d.source)+'-'+(d.target.id||d.target));
     link.exit().remove();
-    link=link.enter().append('line').attr('class','link').merge(link);
+    const linkEnter=link.enter().append('line').attr('class',d=>{if(d.symmetric)return'link symmetric';if(d.added)return'link added';return'link';});
+    link=linkEnter.merge(link);
     node=node.data(nodes,d=>d.id);
     node.exit().remove();
-    const nodeEnter=node.enter().append('circle').attr('class',d=>d.isSupernode?'supernode':'node').attr('r',d=>d.isSupernode?50:30).attr('fill',d=>fused?colorScale(d.ciudad):(clustered?colorScale(d.ciudad):'#3498db')).call(d3.drag().on('start',(e,d)=>{if(!e.active)simulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;}).on('end',(e,d)=>{if(!e.active)simulation.alphaTarget(0);d.fx=null;d.fy=null;})).on('mouseover',(e,d)=>{let html='<strong>'+d.id+'</strong>';if(d.isSupernode){html+='<br><br>👥 <strong>Total personas:</strong> '+d.count;html+='<br>📊 <strong>Edad media:</strong> '+d.avgAge.toFixed(1)+' años';html+='<br><br>🔗 <strong>Conexiones con otras ciudades:</strong>';const cities=['Barcelona','Madrid','Valencia','Sevilla'];cities.forEach(city=>{if(city!==d.ciudad&&d.cityConnections[city]>0){html+='<br>   → '+city+': '+d.cityConnections[city];}});html+='<br><br><strong>Por profesión:</strong>';const profCounts={};d.professions.forEach(p=>{profCounts[p]=(profCounts[p]||0)+1;});Object.keys(profCounts).sort((a,b)=>profCounts[b]-profCounts[a]).forEach(prof=>{html+='<br>   • '+prof+': '+profCounts[prof];});}else{html+='<br>Ciudad: '+d.ciudad+'<br>Edad: '+d.edad+' años<br>Profesión: '+d.profesion;}tooltip.style('opacity',1).html(html).style('left',e.clientX+10+'px').style('top',e.clientY+10+'px');}).on('mousemove',(e)=>tooltip.style('left',e.clientX+10+'px').style('top',e.clientY+10+'px')).on('mouseout',()=>tooltip.style('opacity',0));
+    const nodeEnter=node.enter().append('circle').attr('class',d=>d.isSupernode?'supernode':'node').attr('r',d=>d.isSupernode?50:30).attr('fill',d=>{if(fused)return colorScale(d.ciudad);if(automorphActive&&d.automorphGroup!==undefined)return automorphColorScale(d.automorphGroup);if(kanonActive&&d.degreeGroup!==undefined)return degreeColorScale(d.degreeGroup);if(clustered)return colorScale(d.ciudad);return'#3498db';}).call(d3.drag().on('start',(e,d)=>{if(!e.active)simulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;if(automorphActive){d.targetX=e.x;d.targetY=e.y;}}).on('end',(e,d)=>{if(!e.active)simulation.alphaTarget(0);d.fx=null;d.fy=null;})).on('mouseover',(e,d)=>{let html='<strong style="font-size:14px">'+d.id+'</strong>';if(d.isSupernode){html+='<br><br>🏙️ <strong>Total personas:</strong> '+d.count;html+='<br>📊 <strong>Edad media:</strong> '+d.avgAge.toFixed(1)+' años';if(d.cityConnections){html+='<br><br>🔗 <strong>Conexiones con otras ciudades:</strong>';const cities=['Barcelona','Madrid','Valencia','Sevilla'];cities.forEach(city=>{if(city!==d.ciudad&&d.cityConnections[city]>0){html+='<br>      '+city+': '+d.cityConnections[city];}});}html+='<br><br>💼 <strong>Por profesión:</strong>';const profCounts={};d.professions.forEach(p=>{profCounts[p]=(profCounts[p]||0)+1;});Object.keys(profCounts).sort((a,b)=>profCounts[b]-profCounts[a]).forEach(prof=>{html+='<br>      '+prof+': '+profCounts[prof];});}else{html+='<br>🏙️ Ciudad: '+d.ciudad+'<br>🎂 Edad: '+d.edad+' años<br>💼 Profesión: '+d.profesion;if(automorphActive&&d.shapeType){html+='<br><br><strong style="color:#e74c3c;font-size:13px">🔺 '+d.shapeType.toUpperCase()+'</strong>';html+='<br><strong style="color:#c0392b">🔺 Grupo: '+d.automorphGroup+'</strong>';html+='<br>🔺 Posición en estructura: '+d.shapePosition;}else if(kanonActive&&d.degree!==undefined){html+='<br><br><strong style="color:#9b59b6;font-size:13px">🟣 GRADO: '+d.degree+' conexiones</strong>';if(d.degreeCount!==undefined){html+='<br><strong>🟣 Comparte grado con '+(d.degreeCount-1)+' nodos más</strong>';}}}if(automorphActive){node.classed('highlighted',n=>n.automorphGroup===d.automorphGroup);}tooltip.style('opacity',1).html(html).style('left',e.clientX+10+'px').style('top',e.clientY+10+'px');}).on('mousemove',(e)=>tooltip.style('left',e.clientX+10+'px').style('top',e.clientY+10+'px')).on('mouseout',()=>{tooltip.style('opacity',0);node.classed('highlighted',false);});
     node=nodeEnter.merge(node);
+    node.attr('fill',d=>{if(fused)return colorScale(d.ciudad);if(automorphActive&&d.automorphGroup!==undefined)return automorphColorScale(d.automorphGroup);if(kanonActive&&d.degreeGroup!==undefined)return degreeColorScale(d.degreeGroup);if(clustered)return colorScale(d.ciudad);return'#3498db';});
     label=label.data(nodes,d=>d.id);
     label.exit().remove();
     const labelEnter=label.enter().append('text').attr('class',d=>d.isSupernode?'supernode-label':'node-label').text(d=>d.id);
@@ -95,30 +134,177 @@ function updateGraph(){
     simulation.on('tick',()=>{link.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);node.attr('cx',d=>d.x).attr('cy',d=>d.y);label.attr('x',d=>d.x).attr('y',d=>d.y+5);});
 }
 updateGraph();
+function applyAutomorphism(){
+    if(fused||clustered||kanonActive)return;
+    automorphActive=true;
+    console.log('🔺 CREANDO ESTRUCTURAS SIMÉTRICAS');
+    const triangle1=['Diego','Laura','Patricia'];
+    const triangle2=['Andrés','Rosa','Isabel'];
+    const square1=['Francisco','Manuel','Teresa','Mercedes'];
+    const square2=['Antonio','José','Concepción','Ramón'];
+    const triangles=[triangle1,triangle2];
+    const squares=[square1,square2];
+    const symmetricLinks=[];
+    triangles.forEach((tri,idx)=>{
+        symmetricLinks.push({source:tri[0],target:tri[1],symmetric:true});
+        symmetricLinks.push({source:tri[1],target:tri[2],symmetric:true});
+        symmetricLinks.push({source:tri[2],target:tri[0],symmetric:true});
+        nodes.forEach(n=>{
+            if(tri.includes(n.id)){
+                n.automorphGroup=idx;
+                n.shapeType='Triángulo '+(idx+1);
+                n.shapePosition=tri.indexOf(n.id)+1;
+            }
+        });
+    });
+    squares.forEach((sq,idx)=>{
+        symmetricLinks.push({source:sq[0],target:sq[1],symmetric:true});
+        symmetricLinks.push({source:sq[1],target:sq[2],symmetric:true});
+        symmetricLinks.push({source:sq[2],target:sq[3],symmetric:true});
+        symmetricLinks.push({source:sq[3],target:sq[0],symmetric:true});
+        nodes.forEach(n=>{
+            if(sq.includes(n.id)){
+                n.automorphGroup=idx+2;
+                n.shapeType='Cuadrado '+(idx+1);
+                n.shapePosition=sq.indexOf(n.id)+1;
+            }
+        });
+    });
+    symmetricLinks.forEach(l=>{
+        const exists=links.some(existing=>{
+            const sId=existing.source.id||existing.source;
+            const tId=existing.target.id||existing.target;
+            return(sId===l.source&&tId===l.target)||(sId===l.target&&tId===l.source);
+        });
+        if(!exists){
+            links.push(l);
+        }
+    });
+    groupPositions=[];
+    const startX=200;
+    const startY=200;
+    const spacing=350;
+    triangles.forEach((tri,idx)=>{
+        const centerX=startX+idx*spacing;
+        const centerY=startY;
+        const radius=80;
+        const angles=[Math.PI/2,Math.PI/2+2*Math.PI/3,Math.PI/2+4*Math.PI/3];
+        tri.forEach((nodeId,i)=>{
+            const n=nodes.find(node=>node.id===nodeId);
+            n.targetX=centerX+Math.cos(angles[i])*radius;
+            n.targetY=centerY-Math.sin(angles[i])*radius;
+        });
+        groupPositions.push({type:'triangle',group:idx,centerX:centerX,centerY:centerY,nodes:tri});
+    });
+    squares.forEach((sq,idx)=>{
+        const centerX=startX+idx*spacing;
+        const centerY=startY+300;
+        const size=100;
+        const positions=[
+            {x:centerX-size/2,y:centerY-size/2},
+            {x:centerX+size/2,y:centerY-size/2},
+            {x:centerX+size/2,y:centerY+size/2},
+            {x:centerX-size/2,y:centerY+size/2}
+        ];
+        sq.forEach((nodeId,i)=>{
+            const n=nodes.find(node=>node.id===nodeId);
+            n.targetX=positions[i].x;
+            n.targetY=positions[i].y;
+        });
+        groupPositions.push({type:'square',group:idx+2,centerX:centerX,centerY:centerY,nodes:sq});
+    });
+    console.log('🔺 2 Triángulos creados: '+triangles.map((t,i)=>'Triángulo '+(i+1)+' ('+t.join(', ')+')').join(' | '));
+    console.log('🔺 2 Cuadrados creados: '+squares.map((s,i)=>'Cuadrado '+(i+1)+' ('+s.join(', ')+')').join(' | '));
+    warningBox.classed('protected',false).classed('anonymous',false).classed('kanon',false).classed('automorph',true);
+    warningTitle.html('🔺 K-AUTOMORFISMO APLICADO (k=3)');
+    warningText.html('🔺 <strong>ESTRUCTURAS SIMÉTRICAS CREADAS</strong><br><br>🔺 2 Triángulos (3 nodos cada uno)<br>🔺 2 Cuadrados (4 nodos cada uno)<br>🔺 Líneas ROJAS = simetrías añadidas<br>🔺 Mismo COLOR = misma estructura<br><br><strong style="color:#27ae60">✓ K-automorfismo demostrado visualmente</strong>');
+    automorphBtn.classed('active',true).attr('disabled','disabled');
+    clusterBtn.attr('disabled','disabled');
+    kanonBtn.attr('disabled','disabled');
+    simulation.force('charge',d3.forceManyBody().strength(-200));
+    simulation.force('collision',d3.forceCollide().radius(40));
+    updateGraph();
+}
+function applyKAnonymity(){
+    if(fused||clustered||automorphActive)return;
+    kanonActive=true;
+    const k=3;
+    const newLinks=[];
+    let iterations=0;
+    const maxIterations=100;
+    while(iterations<maxIterations){
+        const degreeMap={};
+        nodes.forEach(n=>{const degree=links.filter(l=>(l.source.id||l.source)===n.id||(l.target.id||l.target)===n.id).length;n.degree=degree;if(!degreeMap[degree])degreeMap[degree]=[];degreeMap[degree].push(n);});
+        const rareDegrees=Object.keys(degreeMap).filter(deg=>degreeMap[deg].length<k);
+        if(rareDegrees.length===0)break;
+        let modified=false;
+        for(const deg of rareDegrees){
+            const nodesWithDeg=degreeMap[deg];
+            const targetDegrees=Object.keys(degreeMap).map(d=>parseInt(d)).sort((a,b)=>Math.abs(degreeMap[b].length-k)-Math.abs(degreeMap[a].length-k));
+            for(const node of nodesWithDeg){
+                let bestTarget=null;
+                for(const targetDeg of targetDegrees){
+                    if(targetDeg===parseInt(deg))continue;
+                    const candidates=degreeMap[targetDeg].filter(other=>other.id!==node.id&&!links.some(l=>((l.source.id||l.source)===node.id&&(l.target.id||l.target)===other.id)||((l.source.id||l.source)===other.id&&(l.target.id||l.target)===node.id)));
+                    if(candidates.length>0){
+                        bestTarget=candidates[0];
+                        break;
+                    }
+                }
+                if(bestTarget){
+                    newLinks.push({source:node.id,target:bestTarget.id,added:true});
+                    links.push({source:node.id,target:bestTarget.id,added:true});
+                    modified=true;
+                    break;
+                }
+            }
+            if(modified)break;
+        }
+        if(!modified)break;
+        iterations++;
+    }
+    const finalDegreeMap={};
+    nodes.forEach(n=>{const degree=links.filter(l=>(l.source.id||l.source)===n.id||(l.target.id||l.target)===n.id).length;n.degree=degree;if(!finalDegreeMap[degree])finalDegreeMap[degree]=[];finalDegreeMap[degree].push(n);});
+    const degreeGroups=Object.keys(finalDegreeMap).sort((a,b)=>parseInt(a)-parseInt(b));
+    const colorMapping={};
+    degreeGroups.forEach((deg,idx)=>{colorMapping[deg]=idx%8;});
+    nodes.forEach(n=>{n.degreeGroup=colorMapping[n.degree];n.degreeCount=finalDegreeMap[n.degree].length;});
+    warningBox.classed('protected',false).classed('anonymous',false).classed('kanon',true).classed('automorph',false);
+    warningTitle.html('🟣 K-ANONIMIDAD APLICADA (k=3)');
+    let statsText='';
+    const allSatisfy=degreeGroups.every(deg=>finalDegreeMap[deg].length>=k);
+    degreeGroups.forEach(deg=>{const count=finalDegreeMap[deg].length;const status=count>=k?'✓':'⚠';statsText+=status+' Grado '+deg+': '+count+' nodos<br>';});
+    warningText.html('🟣 Aristas añadidas (líneas moradas)<br>🟣 Cada grado compartido por ≥3 nodos<br>🟣 '+newLinks.length+' conexiones añadidas<br><br><strong>Distribución final:</strong><br>'+statsText+(allSatisfy?'<br><strong style="color:#27ae60">✓ K-anonimidad satisfecha</strong>':'<br><strong style="color:#e74c3c">⚠ Puede necesitar más aristas</strong>'));
+    kanonBtn.classed('active',true).attr('disabled','disabled');
+    clusterBtn.attr('disabled','disabled');
+    automorphBtn.attr('disabled','disabled');
+    updateGraph();
+}
 function toggleClusters(){
-    if(fused)return;
+    if(fused||kanonActive||automorphActive)return;
     clustered=!clustered;
     if(clustered){
         node.transition().duration(1000).attr('fill',d=>colorScale(d.ciudad));
         clusterLabels.transition().duration(1000).style('opacity',1);
         simulation.force('charge',d3.forceManyBody().strength(-120));
-        warningBox.classed('protected',true);
-        warningTitle.html('✅ PROTECCIÓN MEJORADA');
-        warningText.html('✓ Agrupados por ciudad<br>✓ Identidades individuales menos visibles<br>✓ Clusters visuales por ciudad<br>✓ Dificulta identificación específica<br><br><strong>4 Ciudades<br>30 personas agrupadas</strong>');
-        clusterBtn.classed('active',true).html('👁️ Vista Individual').attr('disabled','disabled');
+        warningBox.classed('protected',true).classed('kanon',false).classed('automorph',false);
+        warningTitle.html('🏙️ PROTECCIÓN MEJORADA');
+        warningText.html('🏙️ Agrupados por ciudad<br>🏙️ Identidades individuales menos visibles<br>🏙️ Clusters visuales por ciudad<br>🏙️ Dificulta identificación específica<br><br><strong>4 Ciudades<br>30 personas agrupadas</strong>');
+        clusterBtn.classed('active',true).html('👤 Vista Individual').attr('disabled','disabled');
+        kanonBtn.attr('disabled','disabled');
+        automorphBtn.attr('disabled','disabled');
         fusionTimeout=setTimeout(fusionNodes,5000);
     }else{
-        if(fusionTimeout){
-            clearTimeout(fusionTimeout);
-            fusionTimeout=null;
-        }
+        if(fusionTimeout){clearTimeout(fusionTimeout);fusionTimeout=null;}
         node.transition().duration(1000).attr('fill','#3498db');
         clusterLabels.transition().duration(1000).style('opacity',0);
         simulation.force('charge',d3.forceManyBody().strength(-250));
-        warningBox.classed('protected',false).classed('anonymous',false);
+        warningBox.classed('protected',false).classed('anonymous',false).classed('kanon',false).classed('automorph',false);
         warningTitle.html('⚠️ RIESGO DE PRIVACIDAD');
-        warningText.html('❌ Todos los nodos son identificables<br>❌ Nombres, edades y profesiones visibles<br>❌ Relaciones personales expuestas<br>❌ Fácil seguimiento individual<br><br><strong>30 personas identificables<br>45 conexiones visibles</strong>');
+        warningText.html('❌ Todos los nodos son identificables<br>❌ Nombres, edades y profesiones visibles<br>❌ Relaciones personales expuestas<br>❌ Grados únicos permiten identificación<br><br><strong>30 personas identificables<br>43 conexiones visibles</strong>');
         clusterBtn.classed('active',false).html('🏙️ Agrupar por Ciudades').attr('disabled',null);
+        kanonBtn.attr('disabled',null);
+        automorphBtn.attr('disabled',null);
     }
     simulation.alpha(1).restart();
 }
@@ -135,30 +321,32 @@ function fusionNodes(){
     simulation.force('charge',d3.forceManyBody().strength(-300));
     simulation.force('collision',d3.forceCollide().radius(60));
     simulation.force('link').distance(200);
-    warningBox.classed('protected',false).classed('anonymous',true);
-    warningTitle.html('🛡️ MÁXIMA PROTECCIÓN');
-    warningText.html('✓ Solo ciudades visibles<br>✓ '+links.length+' conexiones entre ciudades<br>✓ Identidades completamente anonimizadas<br>✓ Solo datos agregados disponibles<br><br><strong>4 Supernodos<br>'+originalNodes.length+' personas protegidas</strong>');
-    clusterBtn.html('🔒 Supernodos Activos');
+    warningBox.classed('protected',false).classed('kanon',false).classed('automorph',false).classed('anonymous',true);
+    warningTitle.html('🔒 MÁXIMA PROTECCIÓN');
+    warningText.html('🔒 Solo ciudades visibles<br>🔒 '+links.length+' conexiones entre ciudades<br>🔒 Identidades completamente anonimizadas<br>🔒 Solo datos agregados disponibles<br><br><strong>4 Supernodos<br>'+originalNodes.length+' personas protegidas</strong>');
+    clusterBtn.html('🏙️ Supernodos Activos');
     updateGraph();
 }
 function resetSimulation(){
-    if(fusionTimeout){
-        clearTimeout(fusionTimeout);
-        fusionTimeout=null;
-    }
-    if(fused){
+    if(fusionTimeout){clearTimeout(fusionTimeout);fusionTimeout=null;}
+    if(fused||kanonActive||automorphActive){
         fused=false;
         clustered=false;
+        kanonActive=false;
+        automorphActive=false;
+        groupPositions=[];
         nodes=JSON.parse(JSON.stringify(originalNodes));
         links=JSON.parse(JSON.stringify(originalLinks));
         simulation.force('charge',d3.forceManyBody().strength(-250));
         simulation.force('collision',d3.forceCollide().radius(35));
         simulation.force('link').distance(90);
         clusterLabels.transition().duration(1000).style('opacity',0);
-        warningBox.classed('anonymous',false).classed('protected',false);
+        warningBox.classed('anonymous',false).classed('protected',false).classed('kanon',false).classed('automorph',false);
         warningTitle.html('⚠️ RIESGO DE PRIVACIDAD');
-        warningText.html('❌ Todos los nodos son identificables<br>❌ Nombres, edades y profesiones visibles<br>❌ Relaciones personales expuestas<br>❌ Fácil seguimiento individual<br><br><strong>30 personas identificables<br>45 conexiones visibles</strong>');
+        warningText.html('❌ Todos los nodos son identificables<br>❌ Nombres, edades y profesiones visibles<br>❌ Relaciones personales expuestas<br>❌ Grados únicos permiten identificación<br><br><strong>30 personas identificables<br>43 conexiones visibles</strong>');
         clusterBtn.classed('active',false).html('🏙️ Agrupar por Ciudades').attr('disabled',null);
+        kanonBtn.classed('active',false).attr('disabled',null);
+        automorphBtn.classed('active',false).attr('disabled',null);
         updateGraph();
     }else{
         simulation.alpha(1).restart();
@@ -170,3 +358,6 @@ function pauseSimulation(){if(isPaused){simulation.alphaTarget(0).restart();isPa
 </body>
 </html>
 "@ | Out-File -FilePath "grafo_interactivo.html" -Encoding UTF8
+
+Write-Host "✅ Archivo 'grafo_interactivo.html' creado correctamente!" -ForegroundColor Green
+Write-Host "📂 Ubicación: $(Get-Location)\grafo_interactivo.html" -ForegroundColor Cyan
